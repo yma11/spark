@@ -1873,4 +1873,11 @@ package object config {
       .version("3.1.0")
       .booleanConf
       .createWithDefault(false)
+
+  private[spark] val SPARK_MEMORY_SPILL_LOG =
+    ConfigBuilder("spark.memory.spill.log")
+      .doc("Enable output for memory spill in Spark. ")
+      .version("3.1.0")
+      .booleanConf
+      .createWithDefault(false)
 }

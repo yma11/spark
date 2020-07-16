@@ -210,7 +210,7 @@ class UnsafeKVExternalSorterSuite extends SparkFunSuite with SharedSparkSession 
   test("SPARK-23376: Create UnsafeKVExternalSorter with BytesToByteMap having duplicated keys") {
     val memoryManager = new TestMemoryManager(new SparkConf())
     val taskMemoryManager = new TaskMemoryManager(memoryManager, 0)
-    val map = new BytesToBytesMap(taskMemoryManager, 64, taskMemoryManager.pageSizeBytes())
+    val map = new BytesToBytesMap(taskMemoryManager, null, 64, taskMemoryManager.pageSizeBytes())
 
     // Key/value are a unsafe rows with a single int column
     val schema = new StructType().add("i", IntegerType)

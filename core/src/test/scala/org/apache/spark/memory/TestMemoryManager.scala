@@ -34,9 +34,43 @@ class TestMemoryManager(conf: SparkConf)
   @GuardedBy("this")
   private val memoryForTask = mutable.HashMap[Long, Long]().withDefaultValue(0L)
 
+  override private[memory] def incMemorySpillSize(v: Long): Unit =
+    _totalMemorySpilledSize.add(v)
+
+  override private[memory] def incDiskSpillSize(v: Long): Unit =
+    _totalDiskSpilledSize.add(v)
+
+  override private[memory] def trackSpilledForMemoryConsumer(
+                                memoryConsumer: MemoryConsumer,
+                                size: Long): Unit = synchronized {
+    val cs = memoryConsumer.toString.substring(0,
+      memoryConsumer.toString().indexOf('@')).split('.')
+    val mc = cs(cs.length - 1)
+    if (!_spilledForMemoryConsumer.contains(mc)) {
+      _spilledForMemoryConsumer(mc) = 0L
+    }
+    _spilledForMemoryConsumer(mc) += size
+  }
+
+  override private[memory] def trackSpilledForMemoryConsumer(
+                                memoryConsumer: String,
+                                size: Long): Unit = synchronized {
+    if (!_spilledForMemoryConsumer.contains(memoryConsumer)) {
+      _spilledForMemoryConsumer(memoryConsumer) = 0L
+    }
+    _spilledForMemoryConsumer(memoryConsumer) += size
+  }
+
+  override private[memory] def incTotalMemoryBorrowedFromExecution(v: Long): Unit =
+    _totalMemoryBorrowedFromExecution.add(v)
+
+  override private[memory] def incTotalMemoryBorrowedFromStorage(v: Long): Unit =
+    _totalMemoryBorrowedFromStorage.add(v)
+
   override private[memory] def acquireExecutionMemory(
       numBytes: Long,
       taskAttemptId: Long,
+      memoryConsumer: MemoryConsumer,
       memoryMode: MemoryMode): Long = synchronized {
     require(numBytes >= 0)
     val acquired = {

@@ -18,7 +18,6 @@
 package org.apache.spark.memory
 
 import javax.annotation.concurrent.GuardedBy
-
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
@@ -27,6 +26,9 @@ import org.apache.spark.storage.memory.MemoryStore
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.array.ByteArrayMethods
 import org.apache.spark.unsafe.memory.MemoryAllocator
+import org.apache.spark.util.{LongAccumulator, Utils}
+
+import scala.collection.mutable
 
 /**
  * An abstract memory manager that enforces how memory is shared between execution and storage.
@@ -77,6 +79,52 @@ private[spark] abstract class MemoryManager(
    */
   def maxOffHeapStorageMemory: Long
 
+  // track spill size of each consumer
+  private[memory] var _spilledForMemoryConsumer = new mutable.HashMap[String, Long]()
+  private[memory] def spilledForMemoryConsumer: mutable.HashMap[String, Long] = {
+    _spilledForMemoryConsumer
+  }
+
+  private[memory] def trackSpilledForMemoryConsumer(memoryConsumer: MemoryConsumer,
+                                                    size: Long): Unit
+
+  private[memory] def trackSpilledForMemoryConsumer(memoryConsumer: String,
+                                                    size: Long): Unit
+
+  // track total memory spill size
+  private[memory] val _totalMemorySpilledSize = new LongAccumulator
+
+  private[memory] def incMemorySpillSize(v: Long): Unit
+
+  private[memory] def totalMemorySpilledSize: Long = {
+    _totalMemorySpilledSize.value
+  }
+
+  // track total disk spill size
+  private[memory] val _totalDiskSpilledSize = new LongAccumulator
+  private[memory] def incDiskSpillSize(v: Long): Unit
+  private[memory] def totalDiskSpilledSize: Long = {
+    _totalDiskSpilledSize.value
+  }
+
+  // track peak memory of current task
+  private[memory] var _peakMemoryUsedForTask = 0L
+  private[memory] var _taskWithPeakMemory = 0L
+  def peakMemoryUsedForTask: Long = _peakMemoryUsedForTask
+
+  // track totalMemoryBorrowedFromExecution
+  private[memory] val _totalMemoryBorrowedFromExecution = new LongAccumulator
+  private[memory] def totalMemoryBorrowedFromExecution: Long = {
+    _totalMemoryBorrowedFromExecution.value
+  }
+  private[memory] def incTotalMemoryBorrowedFromExecution(v: Long): Unit
+
+  // track totalMemoryBorrowedFromStorage
+  private[memory] val _totalMemoryBorrowedFromStorage = new LongAccumulator
+  private[memory] def totalMemoryBorrowedFromStorage: Long = {
+    _totalMemoryBorrowedFromStorage.value
+  }
+  private[memory] def incTotalMemoryBorrowedFromStorage(v: Long): Unit
   /**
    * Set the [[MemoryStore]] used by this manager to evict cached blocks.
    * This must be set after construction due to initialization ordering constraints.
@@ -117,6 +165,7 @@ private[spark] abstract class MemoryManager(
   def acquireExecutionMemory(
       numBytes: Long,
       taskAttemptId: Long,
+      memoryConsumer: MemoryConsumer,
       memoryMode: MemoryMode): Long
 
   /**
@@ -139,6 +188,63 @@ private[spark] abstract class MemoryManager(
    * @return the number of bytes freed.
    */
   private[memory] def releaseAllExecutionMemoryForTask(taskAttemptId: Long): Long = synchronized {
+    if (conf.get(SPARK_MEMORY_SPILL_LOG)) {
+      var spilledInfo: String = ""
+      for(mc <- _spilledForMemoryConsumer.keys) {
+        spilledInfo += ", " + mc + " spills " + Utils.bytesToString(_spilledForMemoryConsumer(mc))
+      }
+      if(spilledInfo != "") {
+        logInfo(s"till now total memory/disk spilled size is " +
+          s"${Utils.bytesToString(_totalMemorySpilledSize.value)}" +
+          s"/${Utils.bytesToString(_totalDiskSpilledSize.value)}" +
+          s" ${spilledInfo}")
+      }
+      logInfo(s"till now totalMemoryBorrowedFromExecution is " +
+        s"${Utils.bytesToString(totalMemoryBorrowedFromExecution)}")
+      logInfo(s"till now totalMemoryBorrowedFromStorage is " +
+        s"${Utils.bytesToString(totalMemoryBorrowedFromStorage)}")
+      val totalDropFromStroageMemory =
+        offHeapStorageMemoryPool.evictedStorage + onHeapStorageMemoryPool.evictedStorage
+      if (totalDropFromStroageMemory != 0) {
+        logInfo(s"till now totalDropFromStroageMemory is " +
+          s"${Utils.bytesToString(totalDropFromStroageMemory)}")
+      }
+      val memroyForTask = onHeapExecutionMemoryPool.getTotalMemoryUsageForTask(taskAttemptId) +
+        offHeapExecutionMemoryPool.getTotalMemoryUsageForTask(taskAttemptId)
+      // + aepExecutionMemoryPool.releaseAllMemoryForTask(taskAttemptId)
+      var isRemovable = true
+      if(memroyForTask > _peakMemoryUsedForTask) {
+        _peakMemoryUsedForTask = memroyForTask
+        _taskWithPeakMemory = taskAttemptId
+        isRemovable = false
+      }
+      val consumers = onHeapExecutionMemoryPool.
+        getMemoryConsumersForTask(_taskWithPeakMemory):::offHeapExecutionMemoryPool.
+        getMemoryConsumersForTask(_taskWithPeakMemory)
+      logInfo(s"till now peakmemoryusedbytask is " + Utils.bytesToString(_peakMemoryUsedForTask)
+        + "(" + consumers.mkString(",") + ")")
+      // remove tracker for current task or the hashmap becomes too large
+      // when amount of tasks executed
+      if(isRemovable) {
+        onHeapExecutionMemoryPool.removeTrackerForTask(taskAttemptId)
+        offHeapExecutionMemoryPool.removeTrackerForTask(taskAttemptId)
+      }
+      // print memory request metrics
+      var requestStats = ""
+      val memoryConsumerList: List[String] = List("ShuffleExternalSorter", "UnsafeExternalSorter",
+        "VariableLengthRowBasedKeyValueBatch", "BytesToBytesMap", "ExternalAppendOnlyMap",
+        "LongToUnsafeRowMap", "ExternalSorter", "FixedLengthRowBasedKeyValueBatch")
+      for(mc <- memoryConsumerList) {
+        val requestSize = onHeapExecutionMemoryPool.getMemoryRequestForConsumer(mc) +
+          offHeapExecutionMemoryPool.getMemoryRequestForConsumer(mc)
+        if(requestSize > 0) {
+          requestStats += mc + " requests total " + Utils.bytesToString(requestSize) + "."
+        }
+      }
+      if(requestStats != "") {
+        logInfo(requestStats)
+      }
+    }
     onHeapExecutionMemoryPool.releaseAllMemoryForTask(taskAttemptId) +
       offHeapExecutionMemoryPool.releaseAllMemoryForTask(taskAttemptId)
   }

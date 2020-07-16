@@ -119,6 +119,21 @@ public class TaskMemoryManager {
    */
   private volatile long acquiredButNotUsed = 0L;
 
+  public void incMemorySpillSize(long v) {
+    memoryManager.incMemorySpillSize(v);
+  }
+
+  public void incDiskSpillSize(long v) {
+    memoryManager.incDiskSpillSize(v);
+  }
+
+  public void updateSpillSize(MemoryConsumer memoryConsumer, long size){
+    memoryManager.trackSpilledForMemoryConsumer(memoryConsumer, size);
+  }
+
+  public void updateSpillSize(String memoryConsumer, long size){
+    memoryManager.trackSpilledForMemoryConsumer(memoryConsumer, size);
+  }
   /**
    * Construct a new TaskMemoryManager.
    */
@@ -144,7 +159,7 @@ public class TaskMemoryManager {
     // off-heap memory. This is subject to change, though, so it may be risky to make this
     // optimization now in case we forget to undo it late when making changes.
     synchronized (this) {
-      long got = memoryManager.acquireExecutionMemory(required, taskAttemptId, mode);
+      long got = memoryManager.acquireExecutionMemory(required, taskAttemptId, consumer, mode);
 
       // Try to release memory from other consumers first, then we can reduce the frequency of
       // spilling, avoid to have too many spilled files.
@@ -178,7 +193,7 @@ public class TaskMemoryManager {
             if (released > 0) {
               logger.debug("Task {} released {} from {} for {}", taskAttemptId,
                 Utils.bytesToString(released), c, consumer);
-              got += memoryManager.acquireExecutionMemory(required - got, taskAttemptId, mode);
+              got += memoryManager.acquireExecutionMemory(required - got, taskAttemptId, consumer, mode);
               if (got >= required) {
                 break;
               }
@@ -209,7 +224,7 @@ public class TaskMemoryManager {
           if (released > 0) {
             logger.debug("Task {} released {} from itself ({})", taskAttemptId,
               Utils.bytesToString(released), consumer);
-            got += memoryManager.acquireExecutionMemory(required - got, taskAttemptId, mode);
+            got += memoryManager.acquireExecutionMemory(required - got, taskAttemptId, consumer, mode);
           }
         } catch (ClosedByInterruptException e) {
           // This called by user to kill a task (e.g: speculative task).

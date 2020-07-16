@@ -255,6 +255,7 @@ final class ShuffleExternalSorter extends MemoryConsumer {
         ((ShuffleWriteMetrics)writeMetricsToUse).recordsWritten());
       taskContext.taskMetrics().incDiskBytesSpilled(
         ((ShuffleWriteMetrics)writeMetricsToUse).bytesWritten());
+      taskContext.taskMemoryManager().incDiskSpillSize(((ShuffleWriteMetrics)writeMetricsToUse).bytesWritten());
     }
   }
 
@@ -280,6 +281,8 @@ final class ShuffleExternalSorter extends MemoryConsumer {
     // records. Otherwise, if the task is over allocated memory, then without freeing the memory
     // pages, we might not be able to get memory for the pointer array.
     taskContext.taskMetrics().incMemoryBytesSpilled(spillSize);
+    taskContext.taskMemoryManager().incMemorySpillSize(spillSize);
+    taskContext.taskMemoryManager().updateSpillSize(this, spillSize);
     return spillSize;
   }
 

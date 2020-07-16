@@ -270,6 +270,7 @@ private[joins] class UnsafeHashedRelation(
 
     binaryMap = new BytesToBytesMap(
       taskMemoryManager,
+      null,
       (nKeys * 1.5 + 1).toInt, // reduce hash collision
       pageSizeBytes)
 
@@ -316,6 +317,7 @@ private[joins] object UnsafeHashedRelation {
       .getOrElse(new SparkConf().get(BUFFER_PAGESIZE).getOrElse(16L * 1024 * 1024))
     val binaryMap = new BytesToBytesMap(
       taskMemoryManager,
+      null,
       // Only 70% of the slots can be used before growing, more capacity help to reduce collision
       (sizeEstimate * 1.5 + 1).toInt,
       pageSizeBytes)

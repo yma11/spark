@@ -22,6 +22,7 @@ import javax.annotation.concurrent.GuardedBy
 import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.util.{LongAccumulator, Utils}
 
 /**
  * Implements policies and bookkeeping for sharing an adjustable-sized pool of memory between tasks.
@@ -48,24 +49,86 @@ private[memory] class ExecutionMemoryPool(
     case MemoryMode.ON_HEAP => "on-heap execution"
     case MemoryMode.OFF_HEAP => "off-heap execution"
   }
-
   /**
    * Map from taskAttemptId -> memory consumption in bytes
    */
   @GuardedBy("lock")
   private val memoryForTask = new mutable.HashMap[Long, Long]()
 
+  var memoryForUnsafeExternalSorter = new LongAccumulator
+  var memoryForShuffleExternalSorter = new LongAccumulator
+  var memoryForVariableLengthRowBasedKeyValueBatch = new LongAccumulator
+  var memoryForBytesToBytesMap = new LongAccumulator
+  var memoryForExternalAppendOnlyMap = new LongAccumulator
+  var memoryForLongToUnsafeRowMap = new LongAccumulator
+  var memoryForExternalSorter = new LongAccumulator
+  var memoryForFixedLengthRowBasedKeyValueBatch = new LongAccumulator
+
+  @GuardedBy("lock")
+  private val memoryconsumersForTask = new mutable.HashMap[Long, List[String]]()
+
   override def memoryUsed: Long = lock.synchronized {
     memoryForTask.values.sum
   }
 
+  def getTotalMemoryUsageForTask(taskAttemptId: Long): Long = lock.synchronized {
+    memoryForTask.getOrElse(taskAttemptId, 0L)
+  }
+
+  def getMemoryConsumersForTask(taskAttemptId: Long): List[String] = lock.synchronized {
+    memoryconsumersForTask.getOrElse(taskAttemptId, Nil)
+  }
+
+  def removeTrackerForTask(taskAttemptId: Long): Unit = lock.synchronized {
+    memoryForTask.remove(taskAttemptId)
+    memoryconsumersForTask.remove(taskAttemptId)
+  }
   /**
    * Returns the memory consumption, in bytes, for the given task.
    */
   def getMemoryUsageForTask(taskAttemptId: Long): Long = lock.synchronized {
     memoryForTask.getOrElse(taskAttemptId, 0L)
   }
+  def updateMemoryRequestForConsumer(mc: String, size: Long): Unit =
+  {
+    mc match {
+      case "ShuffleExternalSorter" =>
+        memoryForShuffleExternalSorter.add(size)
+      case "BytesToBytesMap" =>
+        memoryForBytesToBytesMap.add(size)
+      case "VariableLengthRowBasedKeyValueBatch" =>
+        memoryForVariableLengthRowBasedKeyValueBatch.add(size)
+      case "UnsafeExternalSorter" =>
+        memoryForUnsafeExternalSorter.add(size)
+      case "ExternalAppendOnlyMap" =>
+        memoryForExternalAppendOnlyMap.add(size)
+      case "ExternalSorter" =>
+        memoryForExternalSorter.add(size)
+      case "LongToUnsafeRowMap" =>
+        memoryForLongToUnsafeRowMap.add(size)
+      case "FixedLengthRowBasedKeyValueBatch" =>
+        memoryForFixedLengthRowBasedKeyValueBatch.add(size)
+      case _ => logInfo(s"${mc} doesn't support now.")
+    }
+  }
 
+  def getMemoryRequestForConsumer(mc: String): Long = lock.synchronized{
+    mc match {
+      case "ShuffleExternalSorter" => memoryForShuffleExternalSorter.value
+      case "UnsafeExternalSorter" => memoryForUnsafeExternalSorter.value
+      case "VariableLengthRowBasedKeyValueBatch" =>
+        memoryForVariableLengthRowBasedKeyValueBatch.value
+      case "FixedLengthRowBasedKeyValueBatch" =>
+        memoryForFixedLengthRowBasedKeyValueBatch.value
+      case "BytesToBytesMap" => memoryForBytesToBytesMap.value
+      case "ExternalAppendOnlyMap" => memoryForExternalAppendOnlyMap.value
+      case "LongToUnsafeRowMap" => memoryForLongToUnsafeRowMap.value
+      case "ExternalSorter" => memoryForExternalSorter.value
+      case _ =>
+        logInfo(s"${mc} doesn't support now.")
+        0L
+    }
+  }
   /**
    * Try to acquire up to `numBytes` of memory for the given task and return the number of bytes
    * obtained, or 0 if none can be allocated.
@@ -91,6 +154,7 @@ private[memory] class ExecutionMemoryPool(
   private[memory] def acquireMemory(
       numBytes: Long,
       taskAttemptId: Long,
+      memoryConsumer: MemoryConsumer,
       maybeGrowPool: Long => Unit = (additionalSpaceNeeded: Long) => (),
       computeMaxPoolSize: () => Long = () => poolSize): Long = lock.synchronized {
     assert(numBytes > 0, s"invalid number of bytes requested: $numBytes")
@@ -105,6 +169,10 @@ private[memory] class ExecutionMemoryPool(
       lock.notifyAll()
     }
 
+    if(!memoryconsumersForTask.contains(taskAttemptId)) {
+      memoryconsumersForTask(taskAttemptId) = Nil
+      lock.notifyAll()
+    }
     // Keep looping until we're either sure that we don't want to grant this request (because this
     // task would have more than 1 / numActiveTasks of the memory) or we have enough free
     // memory to give it (we always let each task get at least 1 / (2 * numActiveTasks)).
@@ -139,6 +207,15 @@ private[memory] class ExecutionMemoryPool(
         logInfo(s"TID $taskAttemptId waiting for at least 1/2N of $poolName pool to be free")
         lock.wait()
       } else {
+        val memoryConsumerType =
+          memoryConsumer.toString.substring(0, memoryConsumer.toString().indexOf('@'))
+        val mc = memoryConsumerType.split('.')
+        val consumer = mc(mc.length - 1)
+        if(!memoryconsumersForTask(taskAttemptId).contains(consumer)) {
+          val mcs = consumer +: memoryconsumersForTask(taskAttemptId)
+          memoryconsumersForTask(taskAttemptId) = mcs
+        }
+        updateMemoryRequestForConsumer(consumer, toGrant)
         memoryForTask(taskAttemptId) += toGrant
         return toGrant
       }

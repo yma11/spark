@@ -231,6 +231,10 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
 
     taskContext.taskMetrics().incMemoryBytesSpilled(spillSize);
     taskContext.taskMetrics().incDiskBytesSpilled(writeMetrics.bytesWritten());
+    taskContext.taskMemoryManager().incMemorySpillSize(spillSize);
+    taskContext.taskMemoryManager().incDiskSpillSize(writeMetrics.bytesWritten());
+    taskContext.taskMemoryManager().updateSpillSize(
+            this, spillSize);
     totalSpillBytes += spillSize;
     return spillSize;
   }
@@ -559,6 +563,10 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         inMemSorter = null;
         taskContext.taskMetrics().incMemoryBytesSpilled(released);
         taskContext.taskMetrics().incDiskBytesSpilled(writeMetrics.bytesWritten());
+        taskContext.taskMemoryManager().incMemorySpillSize(released);
+        taskContext.taskMemoryManager().incDiskSpillSize(writeMetrics.bytesWritten());
+        taskContext.taskMemoryManager().updateSpillSize(
+                "UnsafeExternalSorter", released);
         totalSpillBytes += released;
         return released;
       }

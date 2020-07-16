@@ -25,6 +25,7 @@ import java.util.LinkedList;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Closeables;
+import org.apache.spark.TaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,6 +167,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
 
   private final int initialCapacity;
 
+  private final TaskContext taskContext;
   private final BlockManager blockManager;
   private final SerializerManager serializerManager;
   private volatile MapIterator destructiveIterator = null;
@@ -173,6 +175,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
 
   public BytesToBytesMap(
       TaskMemoryManager taskMemoryManager,
+      TaskContext taskContext,
       BlockManager blockManager,
       SerializerManager serializerManager,
       int initialCapacity,
@@ -180,6 +183,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
       long pageSizeBytes) {
     super(taskMemoryManager, pageSizeBytes, taskMemoryManager.getTungstenMemoryMode());
     this.taskMemoryManager = taskMemoryManager;
+    this.taskContext = taskContext;
     this.blockManager = blockManager;
     this.serializerManager = serializerManager;
     this.loadFactor = loadFactor;
@@ -202,10 +206,12 @@ public final class BytesToBytesMap extends MemoryConsumer {
 
   public BytesToBytesMap(
       TaskMemoryManager taskMemoryManager,
+      TaskContext taskContext,
       int initialCapacity,
       long pageSizeBytes) {
     this(
       taskMemoryManager,
+      taskContext != null? taskContext : TaskContext.get(),
       SparkEnv.get() != null ? SparkEnv.get().blockManager() :  null,
       SparkEnv.get() != null ? SparkEnv.get().serializerManager() :  null,
       initialCapacity,
@@ -383,7 +389,12 @@ public final class BytesToBytesMap extends MemoryConsumer {
           break;
         }
       }
-
+      taskContext.taskMetrics().incMemoryBytesSpilled(released);
+      taskContext.taskMetrics().incDiskBytesSpilled(writeMetrics.bytesWritten());
+      taskContext.taskMemoryManager().incMemorySpillSize(released);
+      taskContext.taskMemoryManager().incDiskSpillSize(writeMetrics.bytesWritten());
+      taskContext.taskMemoryManager().updateSpillSize(
+              "BytesToBytesMap", released);
       return released;
     }
 

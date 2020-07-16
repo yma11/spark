@@ -73,6 +73,38 @@ private[spark] class UnifiedMemoryManager(
     maxOffHeapMemory - offHeapExecutionMemoryPool.memoryUsed
   }
 
+  override private[memory] def incMemorySpillSize(v: Long): Unit =
+    _totalMemorySpilledSize.add(v)
+
+  override private[memory] def incDiskSpillSize(v: Long): Unit =
+    _totalDiskSpilledSize.add(v)
+
+  override private[memory] def trackSpilledForMemoryConsumer(
+                                     memoryConsumer: MemoryConsumer,
+                                     size: Long): Unit = synchronized {
+    val cs = memoryConsumer.toString.substring(0,
+      memoryConsumer.toString().indexOf('@')).split('.')
+    val mc = cs(cs.length - 1)
+    if (!_spilledForMemoryConsumer.contains(mc)) {
+      _spilledForMemoryConsumer(mc) = 0L
+    }
+    _spilledForMemoryConsumer(mc) += size
+  }
+
+  override private[memory] def trackSpilledForMemoryConsumer(
+                                      memoryConsumer: String,
+                                      size: Long): Unit = synchronized {
+    if (!_spilledForMemoryConsumer.contains(memoryConsumer)) {
+      _spilledForMemoryConsumer(memoryConsumer) = 0L
+    }
+    _spilledForMemoryConsumer(memoryConsumer) += size
+  }
+
+  override private[memory] def incTotalMemoryBorrowedFromExecution(v: Long): Unit =
+              _totalMemoryBorrowedFromExecution.add(v)
+
+  override private[memory] def incTotalMemoryBorrowedFromStorage(v: Long): Unit =
+              _totalMemoryBorrowedFromStorage.add(v)
   /**
    * Try to acquire up to `numBytes` of execution memory for the current task and return the
    * number of bytes obtained, or 0 if none can be allocated.
@@ -85,6 +117,7 @@ private[spark] class UnifiedMemoryManager(
   override private[memory] def acquireExecutionMemory(
       numBytes: Long,
       taskAttemptId: Long,
+      memoryConsumer: MemoryConsumer,
       memoryMode: MemoryMode): Long = synchronized {
     assertInvariants()
     assert(numBytes >= 0)
@@ -145,7 +178,8 @@ private[spark] class UnifiedMemoryManager(
     }
 
     executionPool.acquireMemory(
-      numBytes, taskAttemptId, maybeGrowExecutionPool, () => computeMaxExecutionPoolSize)
+      numBytes, taskAttemptId, memoryConsumer,
+      maybeGrowExecutionPool, () => computeMaxExecutionPoolSize)
   }
 
   override def acquireStorageMemory(
