@@ -33,10 +33,12 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
   /**
    * Make a [[UnifiedMemoryManager]] and a [[MemoryStore]] with limited class dependencies.
    */
-  private def makeThings(maxMemory: Long): (UnifiedMemoryManager, MemoryStore) = {
+  private def makeThings(maxMemory: Long): (UnifiedMemoryManager, MemoryStore, MemoryConsumer) = {
     val mm = createMemoryManager(maxMemory)
     val ms = makeMemoryStore(mm)
-    (mm, ms)
+    val tmm = new TaskMemoryManager(mm, 1)
+    val mc = new TestMemoryConsumer(tmm)
+    (mm, ms, mc)
   }
 
   override protected def createMemoryManager(
@@ -53,21 +55,21 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
   test("basic execution memory") {
     val maxMemory = 1000L
     val taskAttemptId = 0L
-    val (mm, _) = makeThings(maxMemory)
+    val (mm, _, mc) = makeThings(maxMemory)
     val memoryMode = MemoryMode.ON_HEAP
     assert(mm.executionMemoryUsed === 0L)
-    assert(mm.acquireExecutionMemory(10L, taskAttemptId, memoryMode) === 10L)
+    assert(mm.acquireExecutionMemory(10L, taskAttemptId, mc, memoryMode) === 10L)
     assert(mm.executionMemoryUsed === 10L)
-    assert(mm.acquireExecutionMemory(100L, taskAttemptId, memoryMode) === 100L)
+    assert(mm.acquireExecutionMemory(100L, taskAttemptId, mc, memoryMode) === 100L)
     // Acquire up to the max
-    assert(mm.acquireExecutionMemory(1000L, taskAttemptId, memoryMode) === 890L)
+    assert(mm.acquireExecutionMemory(1000L, taskAttemptId, mc, memoryMode) === 890L)
     assert(mm.executionMemoryUsed === maxMemory)
-    assert(mm.acquireExecutionMemory(1L, taskAttemptId, memoryMode) === 0L)
+    assert(mm.acquireExecutionMemory(1L, taskAttemptId, mc, memoryMode) === 0L)
     assert(mm.executionMemoryUsed === maxMemory)
     mm.releaseExecutionMemory(800L, taskAttemptId, memoryMode)
     assert(mm.executionMemoryUsed === 200L)
     // Acquire after release
-    assert(mm.acquireExecutionMemory(1L, taskAttemptId, memoryMode) === 1L)
+    assert(mm.acquireExecutionMemory(1L, taskAttemptId, mc, memoryMode) === 1L)
     assert(mm.executionMemoryUsed === 201L)
     // Release beyond what was acquired
     mm.releaseExecutionMemory(maxMemory, taskAttemptId, memoryMode)
@@ -76,7 +78,7 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
 
   test("basic storage memory") {
     val maxMemory = 1000L
-    val (mm, ms) = makeThings(maxMemory)
+    val (mm, ms, mc) = makeThings(maxMemory)
     val memoryMode = MemoryMode.ON_HEAP
     assert(mm.storageMemoryUsed === 0L)
     assert(mm.acquireStorageMemory(dummyBlock, 10L, memoryMode))
@@ -123,7 +125,7 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
   test("execution evicts storage") {
     val maxMemory = 1000L
     val taskAttemptId = 0L
-    val (mm, ms) = makeThings(maxMemory)
+    val (mm, ms, mc) = makeThings(maxMemory)
     val memoryMode = MemoryMode.ON_HEAP
     // Acquire enough storage memory to exceed the storage region
     assert(mm.acquireStorageMemory(dummyBlock, 750L, memoryMode))
@@ -131,12 +133,12 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
     assert(mm.executionMemoryUsed === 0L)
     assert(mm.storageMemoryUsed === 750L)
     // Execution needs to request 250 bytes to evict storage memory
-    assert(mm.acquireExecutionMemory(100L, taskAttemptId, memoryMode) === 100L)
+    assert(mm.acquireExecutionMemory(100L, taskAttemptId, mc, memoryMode) === 100L)
     assert(mm.executionMemoryUsed === 100L)
     assert(mm.storageMemoryUsed === 750L)
     assertEvictBlocksToFreeSpaceNotCalled(ms)
     // Execution wants 200 bytes but only 150 are free, so storage is evicted
-    assert(mm.acquireExecutionMemory(200L, taskAttemptId, memoryMode) === 200L)
+    assert(mm.acquireExecutionMemory(200L, taskAttemptId, mc, memoryMode) === 200L)
     assert(mm.executionMemoryUsed === 300L)
     assert(mm.storageMemoryUsed === 700L)
     assertEvictBlocksToFreeSpaceCalled(ms, 50L)
@@ -152,7 +154,7 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
     assert(mm.executionMemoryUsed === 300L)
     // Execution cannot evict storage because the latter is within the storage fraction,
     // so grant only what's remaining without evicting anything, i.e. 1000 - 300 - 400 = 300
-    assert(mm.acquireExecutionMemory(400L, taskAttemptId, memoryMode) === 300L)
+    assert(mm.acquireExecutionMemory(400L, taskAttemptId, mc, memoryMode) === 300L)
     assert(mm.executionMemoryUsed === 600L)
     assert(mm.storageMemoryUsed === 400L)
     assertEvictBlocksToFreeSpaceNotCalled(ms)
@@ -161,7 +163,7 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
   test("execution memory requests smaller than free memory should evict storage (SPARK-12165)") {
     val maxMemory = 1000L
     val taskAttemptId = 0L
-    val (mm, ms) = makeThings(maxMemory)
+    val (mm, ms, mc) = makeThings(maxMemory)
     val memoryMode = MemoryMode.ON_HEAP
     // Acquire enough storage memory to exceed the storage region size
     assert(mm.acquireStorageMemory(dummyBlock, 700L, memoryMode))
@@ -172,7 +174,7 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
     // mistakenly think that the 300 bytes of free space was still available even after
     // using it to expand the execution pool. Consequently, no storage memory was released
     // and the following call granted only 300 bytes to execution.
-    assert(mm.acquireExecutionMemory(500L, taskAttemptId, memoryMode) === 500L)
+    assert(mm.acquireExecutionMemory(500L, taskAttemptId, mc, memoryMode) === 500L)
     assertEvictBlocksToFreeSpaceCalled(ms, 200L)
     assert(mm.storageMemoryUsed === 500L)
     assert(mm.executionMemoryUsed === 500L)
@@ -182,10 +184,10 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
   test("storage does not evict execution") {
     val maxMemory = 1000L
     val taskAttemptId = 0L
-    val (mm, ms) = makeThings(maxMemory)
+    val (mm, ms, mc) = makeThings(maxMemory)
     val memoryMode = MemoryMode.ON_HEAP
     // Acquire enough execution memory to exceed the execution region
-    assert(mm.acquireExecutionMemory(800L, taskAttemptId, memoryMode) === 800L)
+    assert(mm.acquireExecutionMemory(800L, taskAttemptId, mc, memoryMode) === 800L)
     assert(mm.executionMemoryUsed === 800L)
     assert(mm.storageMemoryUsed === 0L)
     assertEvictBlocksToFreeSpaceNotCalled(ms)
@@ -202,7 +204,7 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
     mm.releaseExecutionMemory(maxMemory, taskAttemptId, memoryMode)
     mm.releaseStorageMemory(maxMemory, memoryMode)
     // Acquire some execution memory again, but this time keep it within the execution region
-    assert(mm.acquireExecutionMemory(200L, taskAttemptId, memoryMode) === 200L)
+    assert(mm.acquireExecutionMemory(200L, taskAttemptId, mc, memoryMode) === 200L)
     assert(mm.executionMemoryUsed === 200L)
     assert(mm.storageMemoryUsed === 0L)
     assertEvictBlocksToFreeSpaceNotCalled(ms)
@@ -266,19 +268,21 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
 
     val mm = UnifiedMemoryManager(conf, numCores = 2)
     val ms = makeMemoryStore(mm)
+    val tmm = new TaskMemoryManager(mm, 1)
+    val mc = new TestMemoryConsumer(tmm)
     val memoryMode = MemoryMode.ON_HEAP
     assert(mm.maxHeapMemory === 1000)
     // Have two tasks each acquire some execution memory so that the memory pool registers that
     // there are two active tasks:
-    assert(mm.acquireExecutionMemory(100L, 0, memoryMode) === 100L)
-    assert(mm.acquireExecutionMemory(100L, 1, memoryMode) === 100L)
+    assert(mm.acquireExecutionMemory(100L, 0, mc, memoryMode) === 100L)
+    assert(mm.acquireExecutionMemory(100L, 1, mc, memoryMode) === 100L)
     // Fill up all of the remaining memory with storage.
     assert(mm.acquireStorageMemory(dummyBlock, 800L, memoryMode))
     assertEvictBlocksToFreeSpaceNotCalled(ms)
     assert(mm.storageMemoryUsed === 800)
     assert(mm.executionMemoryUsed === 200)
     // A task should still be able to allocate 100 bytes execution memory by evicting blocks
-    assert(mm.acquireExecutionMemory(100L, 0, memoryMode) === 100L)
+    assert(mm.acquireExecutionMemory(100L, 0, mc, memoryMode) === 100L)
     assertEvictBlocksToFreeSpaceCalled(ms, 100L)
     assert(mm.executionMemoryUsed === 300)
     assert(mm.storageMemoryUsed === 700)
@@ -294,6 +298,8 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
     val mm = UnifiedMemoryManager(conf, numCores = 2)
     makeBadMemoryStore(mm)
     val memoryMode = MemoryMode.ON_HEAP
+    val tmm = new TaskMemoryManager(mm, 1)
+    val mc = new TestMemoryConsumer(tmm)
     // Acquire 1000 then release 600 bytes of storage memory, leaving the
     // storage memory pool at 1000 bytes but only 400 bytes of which are used.
     assert(mm.acquireStorageMemory(dummyBlock, 1000L, memoryMode))
@@ -303,7 +309,7 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
     // by the same amount. If the eviction threw an exception, then we would shrink one pool
     // without enlarging the other, resulting in an assertion failure.
     intercept[RuntimeException] {
-      mm.acquireExecutionMemory(1000L, 0, memoryMode)
+      mm.acquireExecutionMemory(1000L, 0, mc, memoryMode)
     }
     val assertInvariants = PrivateMethod[Unit](Symbol("assertInvariants"))
     mm.invokePrivate[Unit](assertInvariants())
@@ -317,9 +323,11 @@ class UnifiedMemoryManagerSuite extends MemoryManagerSuite with PrivateMethodTes
     val taskAttemptId = 0L
     val mm = UnifiedMemoryManager(conf, numCores = 1)
     val ms = makeMemoryStore(mm)
+    val tmm = new TaskMemoryManager(mm, 1)
+    val mc = new TestMemoryConsumer(tmm)
     val memoryMode = MemoryMode.OFF_HEAP
 
-    assert(mm.acquireExecutionMemory(400L, taskAttemptId, memoryMode) === 400L)
+    assert(mm.acquireExecutionMemory(400L, taskAttemptId, mc, memoryMode) === 400L)
     assert(mm.storageMemoryUsed === 0L)
     assert(mm.executionMemoryUsed === 400L)
 

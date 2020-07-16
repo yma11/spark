@@ -505,6 +505,11 @@ private[spark] abstract class BasePythonRunner[IN, OUT](
       val diskBytesSpilled = stream.readLong()
       context.taskMetrics.incMemoryBytesSpilled(memoryBytesSpilled)
       context.taskMetrics.incDiskBytesSpilled(diskBytesSpilled)
+/*    context.taskMemoryManager().incMemorySpillSize(memoryBytesSpilled)
+      context.taskMemoryManager().incDiskSpillSize(diskBytesSpilled)
+      context.taskMemoryManager().updateSpillSize(
+        this, memoryBytesSpilled)
+        */
     }
 
     protected def handlePythonException(): PythonException = {

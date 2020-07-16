@@ -58,6 +58,9 @@ case class Aggregator[K, V, C] (
       c.taskMetrics().incMemoryBytesSpilled(map.memoryBytesSpilled)
       c.taskMetrics().incDiskBytesSpilled(map.diskBytesSpilled)
       c.taskMetrics().incPeakExecutionMemory(map.peakMemoryUsedBytes)
+      c.taskMemoryManager().incMemorySpillSize(map.memoryBytesSpilled)
+      c.taskMemoryManager().incDiskSpillSize(map.diskBytesSpilled)
+      c.taskMemoryManager().updateSpillSize("ExternalAppendOnlyMap", map.memoryBytesSpilled)
     }
   }
 }

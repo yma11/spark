@@ -18,10 +18,10 @@
 package org.apache.spark.memory
 
 import javax.annotation.concurrent.GuardedBy
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.storage.BlockId
 import org.apache.spark.storage.memory.MemoryStore
+import org.apache.spark.util.LongAccumulator
 
 /**
  * Performs bookkeeping for managing an adjustable-size pool of memory that is used for storage
@@ -45,6 +45,10 @@ private[memory] class StorageMemoryPool(
 
   override def memoryUsed: Long = lock.synchronized {
     _memoryUsed
+  }
+  private[memory] val _evictedStorage = new LongAccumulator
+  def evictedStorage: Long = {
+    _evictedStorage.value
   }
 
   private var _memoryStore: MemoryStore = _
@@ -89,7 +93,8 @@ private[memory] class StorageMemoryPool(
     assert(numBytesToFree >= 0)
     assert(memoryUsed <= poolSize)
     if (numBytesToFree > 0) {
-      memoryStore.evictBlocksToFreeSpace(Some(blockId), numBytesToFree, memoryMode)
+      val freeSpace = memoryStore.evictBlocksToFreeSpace(Some(blockId), numBytesToFree, memoryMode)
+      _evictedStorage.add(freeSpace)
     }
     // NOTE: If the memory store evicts blocks, then those evictions will synchronously call
     // back into this StorageMemoryPool in order to free memory. Therefore, these variables
@@ -130,6 +135,7 @@ private[memory] class StorageMemoryPool(
         memoryStore.evictBlocksToFreeSpace(None, remainingSpaceToFree, memoryMode)
       // When a block is released, BlockManager.dropFromMemory() calls releaseMemory(), so we do
       // not need to decrement _memoryUsed here. However, we do need to decrement the pool size.
+      _evictedStorage.add(spaceFreedByEviction)
       spaceFreedByReleasingUnusedMemory + spaceFreedByEviction
     } else {
       spaceFreedByReleasingUnusedMemory

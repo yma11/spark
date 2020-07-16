@@ -157,6 +157,10 @@ class CoGroupedRDD[K: ClassTag](
     context.taskMetrics().incMemoryBytesSpilled(map.memoryBytesSpilled)
     context.taskMetrics().incDiskBytesSpilled(map.diskBytesSpilled)
     context.taskMetrics().incPeakExecutionMemory(map.peakMemoryUsedBytes)
+    context.taskMemoryManager().incMemorySpillSize(map.memoryBytesSpilled)
+    context.taskMemoryManager().incDiskSpillSize(map.diskBytesSpilled)
+    context.taskMemoryManager().updateSpillSize(
+      "ExternalAppendOnlyMap", map.memoryBytesSpilled)
     new InterruptibleIterator(context,
       map.iterator.asInstanceOf[Iterator[(K, Array[Iterable[_]])]])
   }

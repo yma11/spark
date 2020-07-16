@@ -25,13 +25,14 @@ import org.apache.spark.{SparkConf, SparkFunSuite}
 class TestMemoryManagerSuite extends SparkFunSuite {
   test("tracks allocated execution memory by task") {
     val testMemoryManager = new TestMemoryManager(new SparkConf())
-
+    val tmm = new TaskMemoryManager(testMemoryManager, 1)
+    val mc = new TestMemoryConsumer(tmm)
     assert(testMemoryManager.getExecutionMemoryUsageForTask(0) == 0)
     assert(testMemoryManager.getExecutionMemoryUsageForTask(1) == 0)
 
-    testMemoryManager.acquireExecutionMemory(10, 0, MemoryMode.ON_HEAP)
-    testMemoryManager.acquireExecutionMemory(5, 1, MemoryMode.ON_HEAP)
-    testMemoryManager.acquireExecutionMemory(5, 0, MemoryMode.ON_HEAP)
+    testMemoryManager.acquireExecutionMemory(10, 0, mc, MemoryMode.ON_HEAP)
+    testMemoryManager.acquireExecutionMemory(5, 1, mc, MemoryMode.ON_HEAP)
+    testMemoryManager.acquireExecutionMemory(5, 0, mc, MemoryMode.ON_HEAP)
     assert(testMemoryManager.getExecutionMemoryUsageForTask(0) == 15)
     assert(testMemoryManager.getExecutionMemoryUsageForTask(1) == 5)
 
@@ -46,10 +47,12 @@ class TestMemoryManagerSuite extends SparkFunSuite {
 
   test("markconsequentOOM") {
     val testMemoryManager = new TestMemoryManager(new SparkConf())
-    assert(testMemoryManager.acquireExecutionMemory(1, 0, MemoryMode.ON_HEAP) == 1)
+    val tmm = new TaskMemoryManager(testMemoryManager, 1)
+    val mc = new TestMemoryConsumer(tmm)
+    assert(testMemoryManager.acquireExecutionMemory(1, 0, mc, MemoryMode.ON_HEAP) == 1)
     testMemoryManager.markconsequentOOM(2)
-    assert(testMemoryManager.acquireExecutionMemory(1, 0, MemoryMode.ON_HEAP) == 0)
-    assert(testMemoryManager.acquireExecutionMemory(1, 0, MemoryMode.ON_HEAP) == 0)
-    assert(testMemoryManager.acquireExecutionMemory(1, 0, MemoryMode.ON_HEAP) == 1)
+    assert(testMemoryManager.acquireExecutionMemory(1, 0, mc, MemoryMode.ON_HEAP) == 0)
+    assert(testMemoryManager.acquireExecutionMemory(1, 0, mc, MemoryMode.ON_HEAP) == 0)
+    assert(testMemoryManager.acquireExecutionMemory(1, 0, mc, MemoryMode.ON_HEAP) == 1)
   }
 }

@@ -715,7 +715,10 @@ private[spark] class ExternalSorter[K, V, C](
     context.taskMetrics().incMemoryBytesSpilled(memoryBytesSpilled)
     context.taskMetrics().incDiskBytesSpilled(diskBytesSpilled)
     context.taskMetrics().incPeakExecutionMemory(peakMemoryUsedBytes)
-
+    context.taskMemoryManager().incMemorySpillSize(memoryBytesSpilled)
+    context.taskMemoryManager().incDiskSpillSize(diskBytesSpilled)
+    context.taskMemoryManager().updateSpillSize(
+      this, memoryBytesSpilled)
     lengths
   }
 
@@ -788,6 +791,10 @@ private[spark] class ExternalSorter[K, V, C](
     context.taskMetrics().incMemoryBytesSpilled(memoryBytesSpilled)
     context.taskMetrics().incDiskBytesSpilled(diskBytesSpilled)
     context.taskMetrics().incPeakExecutionMemory(peakMemoryUsedBytes)
+    context.taskMemoryManager().incMemorySpillSize(memoryBytesSpilled)
+    context.taskMemoryManager().incDiskSpillSize(diskBytesSpilled)
+    context.taskMemoryManager().updateSpillSize(
+      this, memoryBytesSpilled)
   }
 
   def stop(): Unit = {

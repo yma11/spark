@@ -50,6 +50,10 @@ case class ReferenceSort(
       context.taskMetrics().incDiskBytesSpilled(sorter.diskBytesSpilled)
       context.taskMetrics().incMemoryBytesSpilled(sorter.memoryBytesSpilled)
       context.taskMetrics().incPeakExecutionMemory(sorter.peakMemoryUsedBytes)
+      context.taskMemoryManager().incMemorySpillSize(sorter.memoryBytesSpilled)
+      context.taskMemoryManager().incDiskSpillSize(sorter.diskBytesSpilled)
+      context.taskMemoryManager().updateSpillSize(
+        "ExternalSorter", sorter.memoryBytesSpilled)
       CompletionIterator[InternalRow, Iterator[InternalRow]](baseIterator, sorter.stop())
     }, preservesPartitioning = true)
   }
