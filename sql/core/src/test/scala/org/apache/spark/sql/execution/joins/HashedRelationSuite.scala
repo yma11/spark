@@ -108,7 +108,7 @@ class HashedRelationSuite extends SharedSparkSession {
         Long.MaxValue / 2,
         1),
       0)
-    val binaryMap = new BytesToBytesMap(taskMemoryManager, 1, 1)
+    val binaryMap = new BytesToBytesMap(taskMemoryManager, null, 1, 1)
     val os = new ByteArrayOutputStream()
     val out = new ObjectOutputStream(os)
     val hashed = new UnsafeHashedRelation(1, 1, binaryMap)

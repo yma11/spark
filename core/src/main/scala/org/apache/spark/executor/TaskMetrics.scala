@@ -54,6 +54,9 @@ class TaskMetrics private[spark] () extends Serializable {
   private val _resultSerializationTime = new LongAccumulator
   private val _memoryBytesSpilled = new LongAccumulator
   private val _diskBytesSpilled = new LongAccumulator
+  private val _shuffleSpillWriteTime = new LongAccumulator
+  private val _shuffleSpillReadTime = new LongAccumulator
+  private val _shuffleSpillDeleteTime = new LongAccumulator
   private val _peakExecutionMemory = new LongAccumulator
   private val _updatedBlockStatuses = new CollectionAccumulator[(BlockId, BlockStatus)]
 
@@ -103,6 +106,10 @@ class TaskMetrics private[spark] () extends Serializable {
    */
   def diskBytesSpilled: Long = _diskBytesSpilled.sum
 
+  def shuffleSpillWriteTime: Long = _shuffleSpillWriteTime.sum
+  def shuffleSpillReadTime: Long = _shuffleSpillReadTime.sum
+  def shuffleSpillDeleteTime: Long = _shuffleSpillDeleteTime.sum
+
   /**
    * Peak memory used by internal data structures created during shuffles, aggregations and
    * joins. The value of this accumulator should be approximately the sum of the peak sizes
@@ -140,6 +147,9 @@ class TaskMetrics private[spark] () extends Serializable {
   private[spark] def setPeakExecutionMemory(v: Long): Unit = _peakExecutionMemory.setValue(v)
   private[spark] def incMemoryBytesSpilled(v: Long): Unit = _memoryBytesSpilled.add(v)
   private[spark] def incDiskBytesSpilled(v: Long): Unit = _diskBytesSpilled.add(v)
+  private[spark] def incShuffleSpillWriteTime(v: Long): Unit = _shuffleSpillWriteTime.add(v)
+  private[spark] def incShuffleSpillReadTime(v: Long): Unit = _shuffleSpillReadTime.add(v)
+  private[spark] def incShuffleSpillDeleteTime(v: Long): Unit = _shuffleSpillDeleteTime.add(v)
   private[spark] def incPeakExecutionMemory(v: Long): Unit = _peakExecutionMemory.add(v)
   private[spark] def incUpdatedBlockStatuses(v: (BlockId, BlockStatus)): Unit =
     _updatedBlockStatuses.add(v)
@@ -218,6 +228,9 @@ class TaskMetrics private[spark] () extends Serializable {
     RESULT_SERIALIZATION_TIME -> _resultSerializationTime,
     MEMORY_BYTES_SPILLED -> _memoryBytesSpilled,
     DISK_BYTES_SPILLED -> _diskBytesSpilled,
+    SHUFFLE_SPILL_WRITE_TIME -> _shuffleSpillWriteTime,
+    SHUFFLE_SPILL_READ_TIME -> _shuffleSpillReadTime,
+    SHUFFLE_SPILL_DELETE_TIME -> _shuffleSpillDeleteTime,
     PEAK_EXECUTION_MEMORY -> _peakExecutionMemory,
     UPDATED_BLOCK_STATUSES -> _updatedBlockStatuses,
     shuffleRead.REMOTE_BLOCKS_FETCHED -> shuffleReadMetrics._remoteBlocksFetched,

@@ -408,6 +408,9 @@ private[spark] object JsonProtocol {
     ("Result Serialization Time" -> taskMetrics.resultSerializationTime) ~
     ("Memory Bytes Spilled" -> taskMetrics.memoryBytesSpilled) ~
     ("Disk Bytes Spilled" -> taskMetrics.diskBytesSpilled) ~
+    ("Spill Write Time" -> taskMetrics.shuffleSpillWriteTime) ~
+    ("Spill Read Time" -> taskMetrics.shuffleSpillReadTime) ~
+    ("Spill Delete Time" -> taskMetrics.shuffleSpillDeleteTime) ~
     ("Shuffle Read Metrics" -> shuffleReadMetrics) ~
     ("Shuffle Write Metrics" -> shuffleWriteMetrics) ~
     ("Input Metrics" -> inputMetrics) ~

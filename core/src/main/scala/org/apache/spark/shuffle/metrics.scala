@@ -49,4 +49,7 @@ private[spark] trait ShuffleWriteMetricsReporter {
   private[spark] def incWriteTime(v: Long): Unit
   private[spark] def decBytesWritten(v: Long): Unit
   private[spark] def decRecordsWritten(v: Long): Unit
+//  private[spark] def incSpillReadTime(v: Long): Unit
+//  private[spark] def incSpillWriteTime(v: Long): Unit
+//  private[spark] def incSpillDeleteTime(v: Long): Unit
 }

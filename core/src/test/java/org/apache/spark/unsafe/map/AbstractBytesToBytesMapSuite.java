@@ -164,7 +164,7 @@ public abstract class AbstractBytesToBytesMapSuite {
 
   @Test
   public void emptyMap() {
-    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 64, PAGE_SIZE_BYTES);
+    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, 64, PAGE_SIZE_BYTES);
     try {
       Assert.assertEquals(0, map.numKeys());
       final int keyLengthInWords = 10;
@@ -179,7 +179,7 @@ public abstract class AbstractBytesToBytesMapSuite {
 
   @Test
   public void setAndRetrieveAKey() {
-    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 64, PAGE_SIZE_BYTES);
+    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, 64, PAGE_SIZE_BYTES);
     final int recordLengthWords = 10;
     final int recordLengthBytes = recordLengthWords * 8;
     final byte[] keyData = getRandomByteArray(recordLengthWords);
@@ -235,7 +235,7 @@ public abstract class AbstractBytesToBytesMapSuite {
 
   private void iteratorTestBase(boolean destructive) throws Exception {
     final int size = 4096;
-    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, size / 2, PAGE_SIZE_BYTES);
+    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, size / 2, PAGE_SIZE_BYTES);
     try {
       for (long i = 0; i < size; i++) {
         final long[] value = new long[] { i };
@@ -318,7 +318,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     final int KEY_LENGTH = 24;
     final int VALUE_LENGTH = 40;
     final BytesToBytesMap map =
-      new BytesToBytesMap(taskMemoryManager, NUM_ENTRIES, PAGE_SIZE_BYTES);
+      new BytesToBytesMap(taskMemoryManager, null, NUM_ENTRIES, PAGE_SIZE_BYTES);
     // Each record will take 8 + 24 + 40 = 72 bytes of space in the data page. Our 64-megabyte
     // pages won't be evenly-divisible by records of this size, which will cause us to waste some
     // space at the end of the page. This is necessary in order for us to take the end-of-record
@@ -387,7 +387,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     // Java arrays' hashCodes() aren't based on the arrays' contents, so we need to wrap arrays
     // into ByteBuffers in order to use them as keys here.
     final Map<ByteBuffer, byte[]> expected = new HashMap<>();
-    final BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, size, PAGE_SIZE_BYTES);
+    final BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, size, PAGE_SIZE_BYTES);
     try {
       // Fill the map to 90% full so that we can trigger probing
       for (int i = 0; i < size * 0.9; i++) {
@@ -439,7 +439,7 @@ public abstract class AbstractBytesToBytesMapSuite {
   @Test
   public void randomizedTestWithRecordsLargerThanPageSize() {
     final long pageSizeBytes = 128;
-    final BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 64, pageSizeBytes);
+    final BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, 64, pageSizeBytes);
     // Java arrays' hashCodes() aren't based on the arrays' contents, so we need to wrap arrays
     // into ByteBuffers in order to use them as keys here.
     final Map<ByteBuffer, byte[]> expected = new HashMap<>();
@@ -492,7 +492,7 @@ public abstract class AbstractBytesToBytesMapSuite {
   @Test
   public void failureToAllocateFirstPage() {
     memoryManager.limit(1024);  // longArray
-    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 1, PAGE_SIZE_BYTES);
+    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, 1, PAGE_SIZE_BYTES);
     try {
       final long[] emptyArray = new long[0];
       final BytesToBytesMap.Location loc =
@@ -508,7 +508,7 @@ public abstract class AbstractBytesToBytesMapSuite {
 
   @Test
   public void failureToGrow() {
-    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 1, 1024);
+    BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, 1, 1024);
     try {
       boolean success = true;
       int i;
@@ -534,7 +534,7 @@ public abstract class AbstractBytesToBytesMapSuite {
   @Test
   public void spillInIterator() throws IOException {
     BytesToBytesMap map = new BytesToBytesMap(
-      taskMemoryManager, blockManager, serializerManager, 1, 0.75, 1024);
+      taskMemoryManager, null, blockManager, serializerManager, 1, 0.75, 1024);
     try {
       int i;
       for (i = 0; i < 1024; i++) {
@@ -573,7 +573,7 @@ public abstract class AbstractBytesToBytesMapSuite {
   @Test
   public void multipleValuesForSameKey() {
     BytesToBytesMap map =
-      new BytesToBytesMap(taskMemoryManager, blockManager, serializerManager, 1, 0.5, 1024);
+      new BytesToBytesMap(taskMemoryManager, null, blockManager, serializerManager, 1, 0.5, 1024);
     try {
       int i;
       for (i = 0; i < 1024; i++) {
@@ -611,7 +611,7 @@ public abstract class AbstractBytesToBytesMapSuite {
   @Test
   public void initialCapacityBoundsChecking() {
     try {
-      new BytesToBytesMap(taskMemoryManager, 0, PAGE_SIZE_BYTES);
+      new BytesToBytesMap(taskMemoryManager, null, 0, PAGE_SIZE_BYTES);
       Assert.fail("Expected IllegalArgumentException to be thrown");
     } catch (IllegalArgumentException e) {
       // expected exception
@@ -620,6 +620,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     try {
       new BytesToBytesMap(
         taskMemoryManager,
+        null,
         BytesToBytesMap.MAX_CAPACITY + 1,
         PAGE_SIZE_BYTES);
       Assert.fail("Expected IllegalArgumentException to be thrown");
@@ -630,6 +631,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     try {
       new BytesToBytesMap(
         taskMemoryManager,
+        null,
         1,
         TaskMemoryManager.MAXIMUM_PAGE_SIZE_BYTES + 1);
       Assert.fail("Expected IllegalArgumentException to be thrown");
@@ -644,7 +646,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     final long recordLengthBytes = 32;
     final long pageSizeBytes = 256 + 8; // 8 bytes for end-of-page marker
     final long numRecordsPerPage = (pageSizeBytes - 8) / recordLengthBytes;
-    final BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, 1024, pageSizeBytes);
+    final BytesToBytesMap map = new BytesToBytesMap(taskMemoryManager, null, 1024, pageSizeBytes);
 
     // Since BytesToBytesMap is append-only, we expect the total memory consumption to be
     // monotonically increasing. More specifically, every time we allocate a new page it
@@ -688,7 +690,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     MemoryMode mode = useOffHeapMemoryAllocator() ? MemoryMode.OFF_HEAP: MemoryMode.ON_HEAP;
     TestMemoryConsumer c1 = new TestMemoryConsumer(taskMemoryManager, mode);
     BytesToBytesMap map =
-      new BytesToBytesMap(taskMemoryManager, blockManager, serializerManager, 1, 0.5, 1024);
+      new BytesToBytesMap(taskMemoryManager, null, blockManager, serializerManager, 1, 0.5, 1024);
 
     Thread thread = new Thread(() -> {
       int i = 0;
@@ -730,7 +732,7 @@ public abstract class AbstractBytesToBytesMapSuite {
     // SPARK-29244: BytesToBytesMap.free after a OOM reset operation should not cause failure.
     memoryManager.limit(5000);
     BytesToBytesMap map =
-      new BytesToBytesMap(taskMemoryManager, blockManager, serializerManager, 256, 0.5, 4000);
+      new BytesToBytesMap(taskMemoryManager, null, blockManager, serializerManager, 256, 0.5, 4000);
     // Force OOM on next memory allocation.
     memoryManager.markExecutionAsOutOfMemoryOnce();
     try {
