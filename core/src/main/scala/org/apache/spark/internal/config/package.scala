@@ -336,6 +336,12 @@ package object config {
     .checkValue(_ >= 0, "The off-heap memory size must not be negative")
     .createWithDefault(0)
 
+  val PMEM_PROPERTY_FILE =
+    ConfigBuilder("spark.memory.extension.pmem.config.file")
+      .doc("A config file used to config Intel PMem settings for memory extension.")
+      .stringConf
+      .createWithDefault("pmem.properties")
+
   private[spark] val MEMORY_STORAGE_FRACTION = ConfigBuilder("spark.memory.storageFraction")
     .doc("Amount of storage memory immune to eviction, expressed as a fraction of the " +
       "size of the region set aside by spark.memory.fraction. The higher this is, the " +

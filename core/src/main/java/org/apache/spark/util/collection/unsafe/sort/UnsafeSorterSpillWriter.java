@@ -20,16 +20,14 @@ package org.apache.spark.util.collection.unsafe.sort;
 import java.io.File;
 import java.io.IOException;
 
+import org.apache.spark.executor.TaskMetrics;
+import org.apache.spark.storage.*;
 import scala.Tuple2;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.SerializerManager;
 import org.apache.spark.executor.ShuffleWriteMetrics;
 import org.apache.spark.serializer.DummySerializerInstance;
-import org.apache.spark.storage.BlockId;
-import org.apache.spark.storage.BlockManager;
-import org.apache.spark.storage.DiskBlockObjectWriter;
-import org.apache.spark.storage.TempLocalBlockId;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.internal.config.package$;
 
@@ -57,7 +55,7 @@ public final class UnsafeSorterSpillWriter {
   private final File file;
   private final BlockId blockId;
   private final int numRecordsToWrite;
-  private DiskBlockObjectWriter writer;
+  private PMemBlockObjectWriter writer;
   private int numRecordsSpilled = 0;
 
   public UnsafeSorterSpillWriter(
@@ -74,8 +72,8 @@ public final class UnsafeSorterSpillWriter {
     // Our write path doesn't actually use this serializer (since we end up calling the `write()`
     // OutputStream methods), but DiskBlockObjectWriter still calls some methods on it. To work
     // around this, we pass a dummy no-op serializer.
-    writer = blockManager.getDiskWriter(
-      blockId, file, DummySerializerInstance.INSTANCE, fileBufferSize, writeMetrics);
+    writer = blockManager.getPMemWriter(
+            blockId, file, DummySerializerInstance.INSTANCE, fileBufferSize, writeMetrics);
     // Write the number of records
     writeIntToBuffer(numRecordsToWrite, 0);
     writer.write(writeBuffer, 0, 4);
@@ -155,8 +153,9 @@ public final class UnsafeSorterSpillWriter {
     return file;
   }
 
-  public UnsafeSorterSpillReader getReader(SerializerManager serializerManager) throws IOException {
-    return new UnsafeSorterSpillReader(serializerManager, file, blockId);
+  public UnsafeSorterSpillReader getReader(SerializerManager serializerManager, Boolean usePMem,
+                                           TaskMetrics metrics) throws IOException {
+    return new UnsafeSorterSpillReader(serializerManager, file, blockId, usePMem, metrics);
   }
 
   public int recordsSpilled() {
