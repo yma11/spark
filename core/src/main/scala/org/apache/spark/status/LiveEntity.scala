@@ -148,6 +148,9 @@ private class LiveTask(
         metrics.resultSerializationTime,
         metrics.memoryBytesSpilled,
         metrics.diskBytesSpilled,
+        metrics.shuffleSpillWriteTime,
+        metrics.shuffleSpillReadTime,
+        metrics.shuffleSpillDeleteTime,
         metrics.peakExecutionMemory,
         metrics.inputMetrics.bytesRead,
         metrics.inputMetrics.recordsRead,
@@ -223,6 +226,9 @@ private class LiveTask(
       taskMetrics.resultSerializationTime,
       taskMetrics.memoryBytesSpilled,
       taskMetrics.diskBytesSpilled,
+      taskMetrics.shuffleSpillWriteTime,
+      taskMetrics.shuffleSpillReadTime,
+      taskMetrics.shuffleSpillDeleteTime,
       taskMetrics.peakExecutionMemory,
       taskMetrics.inputMetrics.bytesRead,
       taskMetrics.inputMetrics.recordsRead,
@@ -238,7 +244,6 @@ private class LiveTask(
       taskMetrics.shuffleWriteMetrics.bytesWritten,
       taskMetrics.shuffleWriteMetrics.writeTime,
       taskMetrics.shuffleWriteMetrics.recordsWritten,
-
       stageId,
       stageAttemptId)
   }
@@ -438,6 +443,11 @@ private class LiveStage extends LiveEntity {
       resultSerializationTime = metrics.resultSerializationTime,
       memoryBytesSpilled = metrics.memoryBytesSpilled,
       diskBytesSpilled = metrics.diskBytesSpilled,
+
+      shuffleSpillWriteTime = metrics.shuffleSpillWriteTime,
+      shuffleSpillReadTime = metrics.shuffleSpillReadTime,
+      shuffleSpillDeleteTime = metrics.shuffleSpillDeleteTime,
+
       peakExecutionMemory = metrics.peakExecutionMemory,
       inputBytes = metrics.inputMetrics.bytesRead,
       inputRecords = metrics.inputMetrics.recordsRead,
@@ -455,7 +465,6 @@ private class LiveStage extends LiveEntity {
       shuffleWriteBytes = metrics.shuffleWriteMetrics.bytesWritten,
       shuffleWriteTime = metrics.shuffleWriteMetrics.writeTime,
       shuffleWriteRecords = metrics.shuffleWriteMetrics.recordsWritten,
-
       name = info.name,
       description = description,
       details = info.details,
@@ -676,6 +685,9 @@ private[spark] object LiveEntityHelpers {
       resultSerializationTime: Long,
       memoryBytesSpilled: Long,
       diskBytesSpilled: Long,
+      shuffleSpillWriteTime: Long,
+      shuffleSpillReadTime: Long,
+      shuffleSpillDeleteTime: Long,
       peakExecutionMemory: Long,
       inputBytesRead: Long,
       inputRecordsRead: Long,
@@ -690,7 +702,8 @@ private[spark] object LiveEntityHelpers {
       shuffleRecordsRead: Long,
       shuffleBytesWritten: Long,
       shuffleWriteTime: Long,
-      shuffleRecordsWritten: Long): v1.TaskMetrics = {
+      shuffleRecordsWritten: Long
+                   ): v1.TaskMetrics = {
     new v1.TaskMetrics(
       executorDeserializeTime,
       executorDeserializeCpuTime,
@@ -701,6 +714,9 @@ private[spark] object LiveEntityHelpers {
       resultSerializationTime,
       memoryBytesSpilled,
       diskBytesSpilled,
+      shuffleSpillWriteTime,
+      shuffleSpillReadTime,
+      shuffleSpillDeleteTime,
       peakExecutionMemory,
       new v1.InputMetrics(
         inputBytesRead,
@@ -726,7 +742,8 @@ private[spark] object LiveEntityHelpers {
   def createMetrics(default: Long): v1.TaskMetrics = {
     createMetrics(default, default, default, default, default, default, default, default,
       default, default, default, default, default, default, default, default,
-      default, default, default, default, default, default, default, default)
+      default, default, default, default, default, default, default, default,
+      default, default, default)
   }
 
   /** Add m2 values to m1. */
@@ -760,6 +777,9 @@ private[spark] object LiveEntityHelpers {
       updateMetricValue(m.resultSerializationTime),
       updateMetricValue(m.memoryBytesSpilled),
       updateMetricValue(m.diskBytesSpilled),
+      updateMetricValue(m.shuffleSpillWriteTime),
+      updateMetricValue(m.shuffleSpillReadTime),
+      updateMetricValue(m.shuffleSpillDeleteTime),
       updateMetricValue(m.peakExecutionMemory),
       updateMetricValue(m.inputMetrics.bytesRead),
       updateMetricValue(m.inputMetrics.recordsRead),
@@ -788,6 +808,9 @@ private[spark] object LiveEntityHelpers {
       m1.resultSerializationTime + m2.resultSerializationTime * mult,
       m1.memoryBytesSpilled + m2.memoryBytesSpilled * mult,
       m1.diskBytesSpilled + m2.diskBytesSpilled * mult,
+      m1.shuffleSpillWriteTime + m2.shuffleSpillWriteTime * mult,
+      m1.shuffleSpillReadTime + m2.shuffleSpillReadTime * mult,
+      m1.shuffleSpillDeleteTime + m2.shuffleSpillDeleteTime * mult,
       m1.peakExecutionMemory + m2.peakExecutionMemory * mult,
       m1.inputMetrics.bytesRead + m2.inputMetrics.bytesRead * mult,
       m1.inputMetrics.recordsRead + m2.inputMetrics.recordsRead * mult,

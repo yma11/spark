@@ -226,6 +226,9 @@ class StageData private[spark](
     val resultSerializationTime: Long,
     val memoryBytesSpilled: Long,
     val diskBytesSpilled: Long,
+    val shuffleSpillWriteTime: Long,
+    val shuffleSpillReadTime: Long,
+    val shuffleSpillDeleteTime: Long,
     val peakExecutionMemory: Long,
     val inputBytes: Long,
     val inputRecords: Long,
@@ -242,6 +245,7 @@ class StageData private[spark](
     val shuffleWriteBytes: Long,
     val shuffleWriteTime: Long,
     val shuffleWriteRecords: Long,
+
 
     val name: String,
     val description: Option[String],
@@ -284,6 +288,9 @@ class TaskMetrics private[spark](
     val resultSerializationTime: Long,
     val memoryBytesSpilled: Long,
     val diskBytesSpilled: Long,
+    val shuffleSpillWriteTime: Long,
+    val shuffleSpillReadTime: Long,
+    val shuffleSpillDeleteTime: Long,
     val peakExecutionMemory: Long,
     val inputMetrics: InputMetrics,
     val outputMetrics: OutputMetrics,
@@ -327,6 +334,9 @@ class TaskMetricDistributions private[spark](
     val peakExecutionMemory: IndexedSeq[Double],
     val memoryBytesSpilled: IndexedSeq[Double],
     val diskBytesSpilled: IndexedSeq[Double],
+    val shuffleSpillWriteTime: IndexedSeq[Double],
+    val shuffleSpillReadTime: IndexedSeq[Double],
+    val shuffleSpillDeleteTime: IndexedSeq[Double],
 
     val inputMetrics: InputMetricDistributions,
     val outputMetrics: OutputMetricDistributions,

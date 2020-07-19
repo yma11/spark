@@ -104,6 +104,12 @@ function getColumnNameForTaskMetricSummary(columnKey) {
 
         case "memoryBytesSpilled":
             return "Spill (memory)";
+        case "shuffleSpillWriteTime":
+            return "Spill Write Time";
+        case "shuffleSpillReadTime":
+            return "Spill Read Time";
+        case "shuffleSpillDeleteTime":
+            return "Spill Delete Time";
 
         case "shuffleReadMetrics":
             return "Shuffle Read Size / Records";
@@ -853,6 +859,48 @@ $(document).ready(function () {
                                 }
                             },
                             name: "Spill (Disk)"
+                        },
+                        {
+                            data : function (row, type) {
+                                if (row.taskMetrics && row.taskMetrics.shuffleWriteMetrics && row.taskMetrics.diskBytesSpilled > 0) {
+                                    if (type === 'display') {
+                                        return formatDuration(parseInt(row.taskMetrics.shuffleSpillWriteTime) / 1000000);
+                                    } else {
+                                        return row.taskMetrics.shuffleSpillWriteTime;
+                                    }
+                                } else {
+                                    return "";
+                                }
+                            },
+                            name: "Spill Write Time"
+                        },
+                        {
+                            data : function (row, type) {
+                                if (row.taskMetrics && row.taskMetrics.shuffleWriteMetrics && row.taskMetrics.diskBytesSpilled > 0) {
+                                    if (type === 'display') {
+                                        return formatDuration(parseInt(row.taskMetrics.shuffleSpillReadTime) / 1000000);
+                                    } else {
+                                        return row.taskMetrics.shuffleSpillReadTime;
+                                    }
+                                } else {
+                                    return "";
+                                }
+                            },
+                            name: "Spill Read Time"
+                        },
+                        {
+                            data : function (row, type) {
+                                if (row.taskMetrics && row.taskMetrics.shuffleWriteMetrics && row.taskMetrics.diskBytesSpilled > 0) {
+                                    if (type === 'display') {
+                                        return formatDuration(parseInt(row.taskMetrics.shuffleSpillDeleteTime) / 1000000);
+                                    } else {
+                                        return row.taskMetrics.shuffleSpillDeleteTime;
+                                    }
+                                } else {
+                                    return "";
+                                }
+                            },
+                            name: "Spill Delete Time"
                         },
                         {
                             data : function (row, type) {

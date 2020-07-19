@@ -208,6 +208,10 @@ private[spark] class AppStatusStore(
         peakExecutionMemory = toValues(_.peakExecutionMemory),
         memoryBytesSpilled = toValues(_.memoryBytesSpilled),
         diskBytesSpilled = toValues(_.diskBytesSpilled),
+
+        shuffleSpillWriteTime = toValues(_.shuffleSpillWriteTime),
+        shuffleSpillReadTime = toValues(_.shuffleSpillReadTime),
+        shuffleSpillDeleteTime = toValues(_.shuffleSpillDeleteTime),
         inputMetrics = new v1.InputMetricDistributions(
           toValues(_.bytesRead),
           toValues(_.recordsRead)),
@@ -285,6 +289,9 @@ private[spark] class AppStatusStore(
       peakExecutionMemory = scanTasks(TaskIndexNames.PEAK_MEM) { t => t.peakExecutionMemory },
       memoryBytesSpilled = scanTasks(TaskIndexNames.MEM_SPILL) { t => t.memoryBytesSpilled },
       diskBytesSpilled = scanTasks(TaskIndexNames.DISK_SPILL) { t => t.diskBytesSpilled },
+      shuffleSpillWriteTime = scanTasks(TaskIndexNames.SHUFFLE_SPILL_WRITE_TIME) { t => t.shuffleSpillWriteTime },
+      shuffleSpillReadTime = scanTasks(TaskIndexNames.SHUFFLE_SPILL_READ_TIME) { t => t.shuffleSpillReadTime },
+      shuffleSpillDeleteTime = scanTasks(TaskIndexNames.SHUFFLE_SPILL_DELETE_TIME) { t => t.shuffleSpillDeleteTime },
       inputMetrics = new v1.InputMetricDistributions(
         scanTasks(TaskIndexNames.INPUT_SIZE) { t => t.inputBytesRead },
         scanTasks(TaskIndexNames.INPUT_RECORDS) { t => t.inputRecordsRead }),
@@ -309,7 +316,8 @@ private[spark] class AppStatusStore(
       shuffleWriteMetrics = new v1.ShuffleWriteMetricDistributions(
         scanTasks(TaskIndexNames.SHUFFLE_WRITE_SIZE) { t => t.shuffleBytesWritten },
         scanTasks(TaskIndexNames.SHUFFLE_WRITE_RECORDS) { t => t.shuffleRecordsWritten },
-        scanTasks(TaskIndexNames.SHUFFLE_WRITE_TIME) { t => t.shuffleWriteTime }))
+        scanTasks(TaskIndexNames.SHUFFLE_WRITE_TIME) { t => t.shuffleWriteTime }
+      ))
 
     // Go through the computed quantiles and cache the values that match the caching criteria.
     computedQuantiles.quantiles.zipWithIndex
@@ -328,6 +336,9 @@ private[spark] class AppStatusStore(
           peakExecutionMemory = computedQuantiles.peakExecutionMemory(idx),
           memoryBytesSpilled = computedQuantiles.memoryBytesSpilled(idx),
           diskBytesSpilled = computedQuantiles.diskBytesSpilled(idx),
+          shuffleSpillWriteTime = computedQuantiles.shuffleSpillWriteTime(idx),
+          shuffleSpillReadTime = computedQuantiles.shuffleSpillReadTime(idx),
+          shuffleSpillDeleteTime = computedQuantiles.shuffleSpillDeleteTime(idx),
 
           bytesRead = computedQuantiles.inputMetrics.bytesRead(idx),
           recordsRead = computedQuantiles.inputMetrics.recordsRead(idx),
@@ -462,6 +473,9 @@ private[spark] class AppStatusStore(
       resultSerializationTime = stage.resultSerializationTime,
       memoryBytesSpilled = stage.memoryBytesSpilled,
       diskBytesSpilled = stage.diskBytesSpilled,
+      shuffleSpillWriteTime = stage.shuffleSpillWriteTime,
+      shuffleSpillReadTime = stage.shuffleSpillReadTime,
+      shuffleSpillDeleteTime = stage.shuffleSpillDeleteTime,
       peakExecutionMemory = stage.peakExecutionMemory,
       inputBytes = stage.inputBytes,
       inputRecords = stage.inputRecords,
