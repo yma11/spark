@@ -75,6 +75,11 @@ class TestMemoryManager(conf: SparkConf)
     memoryForTask.remove(taskAttemptId).getOrElse(0L)
   }
 
+  override private[memory] def acquireExtendedMemory(
+      numBytes: Long,
+      taskAttemptId: Long): Long = synchronized {
+    return 0L;
+  }
   override private[memory] def getExecutionMemoryUsageForTask(taskAttemptId: Long): Long = {
     memoryForTask.getOrElse(taskAttemptId, 0L)
   }

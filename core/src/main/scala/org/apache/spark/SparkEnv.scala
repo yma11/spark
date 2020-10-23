@@ -25,14 +25,13 @@ import scala.collection.JavaConverters._
 import scala.collection.concurrent
 import scala.collection.mutable
 import scala.util.Properties
-
 import com.google.common.cache.CacheBuilder
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.api.python.PythonWorkerFactory
 import org.apache.spark.broadcast.BroadcastManager
-import org.apache.spark.internal.{config, Logging}
+import org.apache.spark.internal.{Logging, config}
 import org.apache.spark.internal.config._
 import org.apache.spark.memory.{MemoryManager, UnifiedMemoryManager}
 import org.apache.spark.metrics.{MetricsSystem, MetricsSystemInstances}
@@ -243,6 +242,14 @@ object SparkEnv extends Logging {
       mockOutputCommitCoordinator: Option[OutputCommitCoordinator] = None): SparkEnv = {
 
     val isDriver = executorId == SparkContext.DRIVER_IDENTIFIER
+
+    val pMemInitialPath = conf.get("spark.memory.pmem.initial.path", "")
+    val pMemInitialSize = conf.getSizeAsBytes("spark.memory.pmem.initial.size", 0L)
+
+    if (!isDriver) {
+      PersistentMemoryPlatform.initialize(pMemInitialPath, pMemInitialSize, 0)
+      logInfo(s"PMem initialize path: ${pMemInitialPath}, size: ${pMemInitialSize} ")
+    }
 
     // Listener bus is only used on the driver
     if (isDriver) {

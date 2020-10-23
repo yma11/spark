@@ -36,6 +36,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.intel</groupId>
+      <artifactId>oap</artifactId>
+      <version>0.8.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-tags_${scala.binary.version}</artifactId>
     </dependency>

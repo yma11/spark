@@ -244,7 +244,7 @@ public class UnsafeExternalSorterSuite {
   public void spillingOccursInResponseToMemoryPressure() throws Exception {
     final UnsafeExternalSorter sorter = newSorter();
     // This should be enough records to completely fill up a data page:
-    final int numRecords = (int) (pageSizeBytes / (4 + 4));
+    final int numRecords = (int) (pageSizeBytes / (8 + 4 + 4));
     for (int i = 0; i < numRecords; i++) {
       insertNumber(sorter, numRecords - i);
     }
@@ -444,7 +444,8 @@ public class UnsafeExternalSorterSuite {
 
   @Test
   public void testPeakMemoryUsed() throws Exception {
-    final long recordLengthBytes = 8;
+    // update recordLengthBytes to 16 since extra 8 bytes(prefix) wrote to page
+    final long recordLengthBytes = 16;
     final long pageSizeBytes = 256;
     final long numRecordsPerPage = pageSizeBytes / recordLengthBytes;
     final UnsafeExternalSorter sorter = UnsafeExternalSorter.create(

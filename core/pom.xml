@@ -36,6 +36,11 @@
   
   <dependencies>
     <dependency>
+      <groupId>com.intel</groupId>
+      <artifactId>oap</artifactId>
+      <version>0.8.0</version>
+    </dependency>
+    <dependency>
       <groupId>com.thoughtworks.paranamer</groupId>
       <artifactId>paranamer</artifactId>
     </dependency>
