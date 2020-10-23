@@ -152,7 +152,9 @@ public final class UnsafeKVExternalSorter {
         final UnsafeExternalRowSorter.PrefixComputer.Prefix prefix =
           prefixComputer.computePrefix(row);
 
-        inMemSorter.insertRecord(address, prefix.value, prefix.isNull);
+        inMemSorter.insertRecord(address, prefix.value,
+                loc.getKeyLength() + loc.getValueLength() + 2 * UnsafeAlignedOffset.getUaoSize(),
+                prefix.isNull);
       }
 
       sorter = UnsafeExternalSorter.createWithExistingInMemorySorter(

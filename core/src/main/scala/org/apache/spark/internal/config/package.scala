@@ -336,6 +336,19 @@ package object config {
     .checkValue(_ >= 0, "The off-heap memory size must not be negative")
     .createWithDefault(0)
 
+  val MEMORY_SPILL_PMEM_ENABLED =
+    ConfigBuilder("spark.memory.spill.pmem.enabled")
+      .doc("Set memory spill to PMem instead of disk.")
+      .booleanConf
+      .createWithDefault(false)
+
+  private[spark] val MEMORY_EXTENDED_SIZE = ConfigBuilder("spark.memory.extended.size")
+    .doc("The absolute amount of memory which can be used for extended memory allocation.")
+    .version("1.6.0")
+    .bytesConf(ByteUnit.BYTE)
+    .checkValue(_ >= 0, "The extended memory size must not be negative")
+    .createWithDefault(0)
+
   private[spark] val MEMORY_STORAGE_FRACTION = ConfigBuilder("spark.memory.storageFraction")
     .doc("Amount of storage memory immune to eviction, expressed as a fraction of the " +
       "size of the region set aside by spark.memory.fraction. The higher this is, the " +
