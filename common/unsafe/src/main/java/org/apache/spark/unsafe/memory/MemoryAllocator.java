@@ -41,4 +41,6 @@ public interface MemoryAllocator {
   MemoryAllocator UNSAFE = new UnsafeMemoryAllocator();
 
   MemoryAllocator HEAP = new HeapMemoryAllocator();
+
+  MemoryAllocator EXTENDED = new ExtendedMemoryAllocator();
 }

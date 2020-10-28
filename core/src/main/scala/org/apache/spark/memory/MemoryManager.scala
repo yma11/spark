@@ -53,6 +53,8 @@ private[spark] abstract class MemoryManager(
   protected val onHeapExecutionMemoryPool = new ExecutionMemoryPool(this, MemoryMode.ON_HEAP)
   @GuardedBy("this")
   protected val offHeapExecutionMemoryPool = new ExecutionMemoryPool(this, MemoryMode.OFF_HEAP)
+  @GuardedBy("this")
+  protected val extendedMemoryPool = new ExtendedMemoryPool(this)
 
   onHeapStorageMemoryPool.incrementPoolSize(onHeapStorageMemory)
   onHeapExecutionMemoryPool.incrementPoolSize(onHeapExecutionMemory)
@@ -63,6 +65,9 @@ private[spark] abstract class MemoryManager(
 
   offHeapExecutionMemoryPool.incrementPoolSize(maxOffHeapMemory - offHeapStorageMemory)
   offHeapStorageMemoryPool.incrementPoolSize(offHeapStorageMemory)
+
+  protected[this] val extendedMemorySize = conf.get(MEMORY_EXTENDED_SIZE)
+  extendedMemoryPool.incrementPoolSize(extendedMemorySize)
 
   /**
    * Total available on heap memory for storage, in bytes. This amount can vary over time,
@@ -120,6 +125,18 @@ private[spark] abstract class MemoryManager(
       memoryMode: MemoryMode): Long
 
   /**
+    * try to acquire numBytes of extended memory for current task and return the number
+    * of number of bytes obtained, or 0 if non can be allocated.
+    * @param numBytes
+    * @param taskAttemptId
+    * @return
+    */
+  private[memory]
+  def acquireExtendedMemory(
+      numBytes: Long,
+      taskAttemptId: Long): Long
+
+  /**
    * Release numBytes of execution memory belonging to the given task.
    */
   private[memory]
@@ -166,6 +183,24 @@ private[spark] abstract class MemoryManager(
    */
   final def releaseUnrollMemory(numBytes: Long, memoryMode: MemoryMode): Unit = synchronized {
     releaseStorageMemory(numBytes, memoryMode)
+  }
+
+  /**
+    * release extended memory of given task
+    * @param numBytes
+    * @param taskAttemptId
+    */
+  def releaseExtendedMemory(numBytes: Long, taskAttemptId: Long): Unit = synchronized {
+    extendedMemoryPool.releaseMemory(numBytes, taskAttemptId)
+  }
+
+  /**
+    * release all extended memory occupied by given task
+    * @param taskAttemptId
+    * @return
+    */
+  def releaseAllExtendedMemoryForTask(taskAttemptId: Long): Long = synchronized {
+    extendedMemoryPool.releaseAllMemoryForTask(taskAttemptId)
   }
 
   /**
@@ -267,4 +302,6 @@ private[spark] abstract class MemoryManager(
       case MemoryMode.OFF_HEAP => MemoryAllocator.UNSAFE
     }
   }
+
+  private[memory] final val extendedMemoryAllocator = MemoryAllocator.EXTENDED
 }
