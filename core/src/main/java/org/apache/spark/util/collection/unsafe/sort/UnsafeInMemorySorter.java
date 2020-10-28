@@ -212,6 +212,11 @@ public final class UnsafeInMemorySorter {
     return array.size() * 8;
   }
 
+  public LongArray getSortedArray() {
+    getSortedIterator();
+    return array;
+  }
+
   public boolean hasSpaceForAnotherRecord() {
     return pos + 1 < usableCapacity;
   }
@@ -271,6 +276,7 @@ public final class UnsafeInMemorySorter {
     private Object baseObject;
     private long baseOffset;
     private long keyPrefix;
+    private long currentRecordPointer;
     private int recordLength;
     private long currentPageNumber;
     private final TaskContext taskContext = TaskContext.get();
@@ -314,6 +320,7 @@ public final class UnsafeInMemorySorter {
       }
       // This pointer points to a 4-byte record length, followed by the record's bytes
       final long recordPointer = array.get(offset + position);
+      currentRecordPointer = recordPointer;
       currentPageNumber = TaskMemoryManager.decodePageNumber(recordPointer);
       int uaoSize = UnsafeAlignedOffset.getUaoSize();
       baseObject = memoryManager.getPage(recordPointer);
@@ -339,6 +346,8 @@ public final class UnsafeInMemorySorter {
 
     @Override
     public long getKeyPrefix() { return keyPrefix; }
+
+    public long getCurrentRecordPointer() { return currentRecordPointer; }
   }
 
   /**
