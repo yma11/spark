@@ -33,11 +33,11 @@
   <properties>
     <sbt.project.name>core</sbt.project.name>
   </properties>
-  
+
   <dependencies>
     <dependency>
-      <groupId>com.intel</groupId>
-      <artifactId>oap</artifactId>
+      <groupId>com.intel.oap</groupId>
+      <artifactId>oap-common</artifactId>
       <version>0.9.0</version>
     </dependency>
     <dependency>
