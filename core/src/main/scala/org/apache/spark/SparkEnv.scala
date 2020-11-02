@@ -243,10 +243,10 @@ object SparkEnv extends Logging {
 
     val isDriver = executorId == SparkContext.DRIVER_IDENTIFIER
 
-    val pMemInitialPath = conf.get("spark.memory.memory.extended.path", "")
-    val pMemInitialSize = conf.getSizeAsBytes("spark.memory.extended.size", 0L)
-
-    if (!isDriver) {
+    val pMemEnabled = conf.get("spark.memory.spill.pmem.enabled");
+    if (pMemEnabled == "true" && !isDriver) {
+      val pMemInitialPath = conf.get("spark.memory.extended.path", "")
+      val pMemInitialSize = conf.getSizeAsBytes("spark.memory.extended.size", 0L)
       PersistentMemoryPlatform.initialize(pMemInitialPath, pMemInitialSize, 0)
       logInfo(s"PMem initialize path: ${pMemInitialPath}, size: ${pMemInitialSize} ")
     }
