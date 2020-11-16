@@ -398,6 +398,9 @@ private[spark] object JsonProtocol {
     ("Result Serialization Time" -> taskMetrics.resultSerializationTime) ~
     ("Memory Bytes Spilled" -> taskMetrics.memoryBytesSpilled) ~
     ("Disk Bytes Spilled" -> taskMetrics.diskBytesSpilled) ~
+    ("Spill Write Time" -> taskMetrics.shuffleSpillWriteTime) ~
+    ("Spill Read Time" -> taskMetrics.shuffleSpillReadTime) ~
+    ("Spill Delete Time" -> taskMetrics.shuffleSpillDeleteTime) ~
     ("Shuffle Read Metrics" -> shuffleReadMetrics) ~
     ("Shuffle Write Metrics" -> shuffleWriteMetrics) ~
     ("Input Metrics" -> inputMetrics) ~
@@ -906,6 +909,9 @@ private[spark] object JsonProtocol {
     metrics.setResultSerializationTime((json \ "Result Serialization Time").extract[Long])
     metrics.incMemoryBytesSpilled((json \ "Memory Bytes Spilled").extract[Long])
     metrics.incDiskBytesSpilled((json \ "Disk Bytes Spilled").extract[Long])
+    metrics.incShuffleSpillWriteTime((json \ "Spill Write Time").extract[Long])
+    metrics.incShuffleSpillReadTime((json \ "Spill Read Time").extract[Long])
+    metrics.incShuffleSpillDeleteTime((json \ "Spill Delete Time").extract[Long])
 
     // Shuffle read metrics
     jsonOption(json \ "Shuffle Read Metrics").foreach { readJson =>

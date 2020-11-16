@@ -21,6 +21,7 @@ import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
 import org.apache.spark.SparkEnv;
 import org.apache.spark.TaskContext;
+import org.apache.spark.executor.TaskMetrics;
 import org.apache.spark.internal.config.package$;
 import org.apache.spark.internal.config.ConfigEntry;
 import org.apache.spark.io.NioBufferedFileInputStream;
@@ -50,12 +51,15 @@ public final class UnsafeSorterSpillReader extends UnsafeSorterIterator implemen
   private byte[] arr = new byte[1024 * 1024];
   private Object baseObject = arr;
   private final TaskContext taskContext = TaskContext.get();
+  private final TaskMetrics taskMetrics;
 
   public UnsafeSorterSpillReader(
       SerializerManager serializerManager,
+      TaskMetrics taskMetrics,
       File file,
       BlockId blockId) throws IOException {
     assert (file.length() > 0);
+    this.taskMetrics = taskMetrics;
     final ConfigEntry<Object> bufferSizeConfigEntry =
         package$.MODULE$.UNSAFE_SORTER_SPILL_READER_BUFFER_SIZE();
     // This value must be less than or equal to MAX_BUFFER_SIZE_BYTES. Cast to int is always safe.
@@ -77,7 +81,10 @@ public final class UnsafeSorterSpillReader extends UnsafeSorterIterator implemen
         this.in = serializerManager.wrapStream(blockId, bs);
       }
       this.din = new DataInputStream(this.in);
+      long startTime = System.nanoTime();
       numRecords = numRecordsRemaining = din.readInt();
+      long duration = System.nanoTime() - startTime;
+      this.taskMetrics.incShuffleSpillReadTime(duration);
     } catch (IOException e) {
       Closeables.close(bs, /* swallowIOException = */ true);
       throw e;
@@ -104,6 +111,7 @@ public final class UnsafeSorterSpillReader extends UnsafeSorterIterator implemen
     if (taskContext != null) {
       taskContext.killTaskIfInterrupted();
     }
+    long startTime = System.nanoTime();
     recordLength = din.readInt();
     keyPrefix = din.readLong();
     if (recordLength > arr.length) {
@@ -115,6 +123,8 @@ public final class UnsafeSorterSpillReader extends UnsafeSorterIterator implemen
     if (numRecordsRemaining == 0) {
       close();
     }
+    long duration = System.nanoTime() - startTime;
+    taskMetrics.incShuffleSpillReadTime(duration);
   }
 
   @Override

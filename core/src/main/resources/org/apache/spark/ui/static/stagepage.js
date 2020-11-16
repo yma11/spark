@@ -856,6 +856,48 @@ $(document).ready(function () {
                         },
                         {
                             data : function (row, type) {
+                                if (row.taskMetrics && row.taskMetrics.diskBytesSpilled > 0) {
+                                    if (type === 'display') {
+                                        return formatDuration(parseInt(row.taskMetrics.shuffleSpillWriteTime) / 1000000);
+                                    } else {
+                                        return row.taskMetrics.shuffleSpillWriteTime;
+                                    }
+                                } else {
+                                    return "";
+                                }
+                            },
+                            name: "Spill Write Time"
+                        },
+                        {
+                            data : function (row, type) {
+                                if (row.taskMetrics && row.taskMetrics.diskBytesSpilled > 0) {
+                                    if (type === 'display') {
+                                        return formatDuration(parseInt(row.taskMetrics.shuffleSpillReadTime) / 1000000);
+                                    } else {
+                                        return row.taskMetrics.shuffleSpillReadTime;
+                                    }
+                                } else {
+                                    return "";
+                                }
+                            },
+                            name: "Spill Read Time"
+                        },
+                        {
+                            data : function (row, type) {
+                                if (row.taskMetrics && row.taskMetrics.diskBytesSpilled > 0) {
+                                    if (type === 'display') {
+                                        return formatDuration(parseInt(row.taskMetrics.shuffleSpillDeleteTime) / 1000000);
+                                    } else {
+                                        return row.taskMetrics.shuffleSpillDeleteTime;
+                                    }
+                                } else {
+                                    return "";
+                                }
+                            },
+                            name: "Spill Delete Time"
+                        },
+                        {
+                            data : function (row, type) {
                                 var msg = row.errorMessage;
                                 if (typeof msg === 'undefined') {
                                     return "";

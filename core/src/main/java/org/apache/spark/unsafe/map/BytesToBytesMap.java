@@ -25,6 +25,7 @@ import java.util.LinkedList;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Closeables;
+import org.apache.spark.TaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,6 +72,8 @@ public final class BytesToBytesMap extends MemoryConsumer {
   private static final HashMapGrowthStrategy growthStrategy = HashMapGrowthStrategy.DOUBLING;
 
   private final TaskMemoryManager taskMemoryManager;
+
+  private final TaskContext taskContext;
 
   /**
    * A linked list for tracking all allocated data pages so that we can free all of our memory.
@@ -173,6 +176,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
 
   public BytesToBytesMap(
       TaskMemoryManager taskMemoryManager,
+      TaskContext taskContext,
       BlockManager blockManager,
       SerializerManager serializerManager,
       int initialCapacity,
@@ -180,6 +184,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
       long pageSizeBytes) {
     super(taskMemoryManager, pageSizeBytes, taskMemoryManager.getTungstenMemoryMode());
     this.taskMemoryManager = taskMemoryManager;
+    this.taskContext = taskContext;
     this.blockManager = blockManager;
     this.serializerManager = serializerManager;
     this.loadFactor = loadFactor;
@@ -202,10 +207,12 @@ public final class BytesToBytesMap extends MemoryConsumer {
 
   public BytesToBytesMap(
       TaskMemoryManager taskMemoryManager,
+      TaskContext taskContext,
       int initialCapacity,
       long pageSizeBytes) {
     this(
       taskMemoryManager,
+      taskContext != null ? taskContext : TaskContext.get(),
       SparkEnv.get() != null ? SparkEnv.get().blockManager() :  null,
       SparkEnv.get() != null ? SparkEnv.get().serializerManager() :  null,
       initialCapacity,
@@ -282,7 +289,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
             }
             try {
               Closeables.close(reader, /* swallowIOException = */ false);
-              reader = spillWriters.getFirst().getReader(serializerManager);
+              reader = spillWriters.getFirst().getReader(serializerManager, taskContext.taskMetrics());
               recordsInPage = -1;
             } catch (IOException e) {
               // Scala iterator does not handle exception
@@ -351,6 +358,7 @@ public final class BytesToBytesMap extends MemoryConsumer {
       // TODO: use existing ShuffleWriteMetrics
       ShuffleWriteMetrics writeMetrics = new ShuffleWriteMetrics();
 
+      long startTime = System.nanoTime();
       long released = 0L;
       while (dataPages.size() > 0) {
         MemoryBlock block = dataPages.getLast();
@@ -383,6 +391,8 @@ public final class BytesToBytesMap extends MemoryConsumer {
           break;
         }
       }
+      long duration = System.nanoTime() - startTime;
+      taskContext.taskMetrics().incShuffleSpillWriteTime(duration);
 
       return released;
     }
@@ -393,11 +403,15 @@ public final class BytesToBytesMap extends MemoryConsumer {
     }
 
     private void handleFailedDelete() {
+      long startTime = System.nanoTime();
       // remove the spill file from disk
       File file = spillWriters.removeFirst().getFile();
       if (file != null && file.exists() && !file.delete()) {
         logger.error("Was unable to delete spill file {}", file.getAbsolutePath());
       }
+      long duration = System.nanoTime() - startTime;
+      if(file != null)
+        taskContext.taskMetrics().incShuffleSpillDeleteTime(duration);
     }
   }
 

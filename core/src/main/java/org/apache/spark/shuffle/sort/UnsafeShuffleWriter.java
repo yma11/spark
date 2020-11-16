@@ -222,11 +222,15 @@ public class UnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
     try {
       partitionLengths = mergeSpills(spills);
     } finally {
+      long startTime = System.nanoTime();
       for (SpillInfo spill : spills) {
         if (spill.file.exists() && !spill.file.delete()) {
           logger.error("Error while deleting spill file {}", spill.file.getPath());
         }
       }
+      long duration = System.nanoTime() - startTime;
+      if(spills.length != 0)
+        taskContext.taskMetrics().incShuffleSpillDeleteTime(duration);
     }
     mapStatus = MapStatus$.MODULE$.apply(
       blockManager.shuffleServerId(), partitionLengths, mapId);
@@ -285,6 +289,7 @@ public class UnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
   }
 
   private long[] mergeSpillsUsingStandardWriter(SpillInfo[] spills) throws IOException {
+    long startTime = System.nanoTime();
     long[] partitionLengths;
     final boolean compressionEnabled = (boolean) sparkConf.get(package$.MODULE$.SHUFFLE_COMPRESS());
     final CompressionCodec compressionCodec = CompressionCodec$.MODULE$.createCodec(sparkConf);
@@ -337,6 +342,8 @@ public class UnsafeShuffleWriter<K, V> extends ShuffleWriter<K, V> {
       }
       throw e;
     }
+    long duration = System.nanoTime() - startTime;
+    taskContext.taskMetrics().incShuffleSpillReadTime(duration);
     return partitionLengths;
   }
 

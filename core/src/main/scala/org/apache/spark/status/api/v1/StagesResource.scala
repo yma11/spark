@@ -192,6 +192,12 @@ private[v1] class StagesResource extends BaseAppResource {
         || containsValue(UIUtils.formatDuration(task.taskMetrics.get.resultSerializationTime))
         || containsValue(Utils.bytesToString(task.taskMetrics.get.memoryBytesSpilled))
         || containsValue(Utils.bytesToString(task.taskMetrics.get.diskBytesSpilled))
+        || containsValue(UIUtils.formatDuration(
+          task.taskMetrics.get.shuffleSpillWriteTime / 1000000))
+        || containsValue(UIUtils.formatDuration(
+          task.taskMetrics.get.shuffleSpillReadTime / 1000000))
+        || containsValue(UIUtils.formatDuration(
+          task.taskMetrics.get.shuffleSpillDeleteTime / 1000000))
         || containsValue(Utils.bytesToString(task.taskMetrics.get.peakExecutionMemory))
         || containsValue(Utils.bytesToString(task.taskMetrics.get.inputMetrics.bytesRead))
         || containsValue(task.taskMetrics.get.inputMetrics.recordsRead)

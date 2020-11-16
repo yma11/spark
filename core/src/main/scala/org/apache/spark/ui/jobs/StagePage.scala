@@ -185,6 +185,18 @@ private[ui] class StagePage(parent: StagesTab, store: AppStatusStore) extends We
               <strong>Spill (Disk): </strong>
               {Utils.bytesToString(stageData.diskBytesSpilled)}
             </li>
+            <li>
+              <strong>Spill Write Time</strong>
+              {s"${UIUtils.formatDuration(stageData.shuffleSpillWriteTime / 1000000)}"}
+             </li>
+             <li>
+               <strong>Spill Read Time</strong>
+               {s"${UIUtils.formatDuration(stageData.shuffleSpillReadTime / 1000000)}"}
+             </li>
+             <li>
+               <strong>Spill Delete Time</strong>
+               {s"${UIUtils.formatDuration(stageData.shuffleSpillDeleteTime / 1000000)}"}
+             </li>
           }}
           {if (!stageJobIds.isEmpty) {
             <li>
@@ -549,7 +561,9 @@ private[ui] class TaskPagedTable(
           Nil
         }} ++
         {if (hasBytesSpilled(stage)) {
-          Seq((HEADER_MEM_SPILL, ""), (HEADER_DISK_SPILL, ""))
+          Seq((HEADER_MEM_SPILL, ""), (HEADER_DISK_SPILL, ""),
+            (HEADER_SHUFFLE_SPILL_WRITE_TIME, ""), (HEADER_SHUFFLE_SPILL_READ_TIME, ""),
+            (HEADER_SHUFFLE_SPILL_DELETE_TIME, ""))
         } else {
           Nil
         }} ++
@@ -693,6 +707,27 @@ private[ui] class TaskPagedTable(
       {if (hasBytesSpilled(stage)) {
         <td>{formatBytes(task.taskMetrics.map(_.memoryBytesSpilled))}</td>
         <td>{formatBytes(task.taskMetrics.map(_.diskBytesSpilled))}</td>
+        <td>{
+          formatDuration(
+            task.taskMetrics.map { m =>
+              TimeUnit.NANOSECONDS.toMillis(m.shuffleSpillWriteTime)
+            },
+            hideZero = true)
+        }</td>
+        <td>{
+          formatDuration(
+            task.taskMetrics.map { m =>
+              TimeUnit.NANOSECONDS.toMillis(m.shuffleSpillReadTime)
+            },
+            hideZero = true)
+        }</td>
+        <td>{
+          formatDuration(
+            task.taskMetrics.map { m =>
+              TimeUnit.NANOSECONDS.toMillis(m.shuffleSpillDeleteTime)
+            },
+            hideZero = true)
+        }</td>
       }}
       {errorMessageCell(task.errorMessage.getOrElse(""))}
     </tr>
@@ -751,6 +786,9 @@ private[spark] object ApiHelper {
   val HEADER_SHUFFLE_REMOTE_READS = "Shuffle Remote Reads"
   val HEADER_SHUFFLE_WRITE_TIME = "Write Time"
   val HEADER_SHUFFLE_WRITE_SIZE = "Shuffle Write Size / Records"
+  val HEADER_SHUFFLE_SPILL_WRITE_TIME = "Spill Write Time"
+  val HEADER_SHUFFLE_SPILL_READ_TIME = "Spill Read Time"
+  val HEADER_SHUFFLE_SPILL_DELETE_TIME = "Spill Delete Time"
   val HEADER_MEM_SPILL = "Spill (Memory)"
   val HEADER_DISK_SPILL = "Spill (Disk)"
   val HEADER_ERROR = "Errors"
@@ -781,6 +819,9 @@ private[spark] object ApiHelper {
     HEADER_SHUFFLE_REMOTE_READS -> TaskIndexNames.SHUFFLE_REMOTE_READS,
     HEADER_SHUFFLE_WRITE_TIME -> TaskIndexNames.SHUFFLE_WRITE_TIME,
     HEADER_SHUFFLE_WRITE_SIZE -> TaskIndexNames.SHUFFLE_WRITE_SIZE,
+    HEADER_SHUFFLE_SPILL_WRITE_TIME -> TaskIndexNames.SHUFFLE_SPILL_WRITE_TIME,
+    HEADER_SHUFFLE_SPILL_READ_TIME -> TaskIndexNames.SHUFFLE_SPILL_READ_TIME,
+    HEADER_SHUFFLE_SPILL_DELETE_TIME -> TaskIndexNames.SHUFFLE_SPILL_DELETE_TIME,
     HEADER_MEM_SPILL -> TaskIndexNames.MEM_SPILL,
     HEADER_DISK_SPILL -> TaskIndexNames.DISK_SPILL,
     HEADER_ERROR -> TaskIndexNames.ERROR)

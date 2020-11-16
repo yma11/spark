@@ -187,6 +187,7 @@ final class ShuffleExternalSorter extends MemoryConsumer {
     // around this, we pass a dummy no-op serializer.
     final SerializerInstance ser = DummySerializerInstance.INSTANCE;
 
+    long startTime = System.nanoTime();
     int currentPartition = -1;
     final FileSegment committedSegment;
     try (DiskBlockObjectWriter writer =
@@ -231,6 +232,7 @@ final class ShuffleExternalSorter extends MemoryConsumer {
       spillInfo.partitionLengths[currentPartition] = committedSegment.length();
       spills.add(spillInfo);
     }
+    long duration = System.nanoTime() - startTime;
 
     if (!isLastFile) {  // i.e. this is a spill file
       // The current semantics of `shuffleRecordsWritten` seem to be that it's updated when records
@@ -255,6 +257,7 @@ final class ShuffleExternalSorter extends MemoryConsumer {
         ((ShuffleWriteMetrics)writeMetricsToUse).recordsWritten());
       taskContext.taskMetrics().incDiskBytesSpilled(
         ((ShuffleWriteMetrics)writeMetricsToUse).bytesWritten());
+      taskContext.taskMetrics().incShuffleSpillWriteTime(duration);
     }
   }
 
@@ -328,11 +331,15 @@ final class ShuffleExternalSorter extends MemoryConsumer {
       inMemSorter.free();
       inMemSorter = null;
     }
+    long startTime = System.nanoTime();
     for (SpillInfo spill : spills) {
       if (spill.file.exists() && !spill.file.delete()) {
         logger.error("Unable to delete spill file {}", spill.file.getPath());
       }
     }
+    long duration = System.nanoTime() - startTime;
+    if(!spills.isEmpty())
+      taskContext.taskMetrics().incShuffleSpillDeleteTime(duration);
   }
 
   /**

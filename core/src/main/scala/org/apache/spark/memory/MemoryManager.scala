@@ -67,7 +67,7 @@ private[spark] abstract class MemoryManager(
   offHeapStorageMemoryPool.incrementPoolSize(offHeapStorageMemory)
 
   protected[this] val extendedMemorySize = conf.get(MEMORY_EXTENDED_SIZE)
-  extendedMemoryPool.incrementPoolSize(extendedMemorySize)
+  extendedMemoryPool.incrementPoolSize((extendedMemorySize * 0.9).toLong)
 
   /**
    * Total available on heap memory for storage, in bytes. This amount can vary over time,

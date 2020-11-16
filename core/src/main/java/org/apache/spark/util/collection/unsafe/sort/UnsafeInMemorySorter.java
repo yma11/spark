@@ -162,6 +162,12 @@ public final class UnsafeInMemorySorter {
   /**
    * Free the memory used by pointer array.
    */
+  public void freeWithoutLongArray() {
+    if (consumer != null) {
+      array = null;
+    }
+  }
+
   public void free() {
     if (consumer != null) {
       if (array != null) {
@@ -169,6 +175,24 @@ public final class UnsafeInMemorySorter {
       }
       array = null;
     }
+  }
+
+  public void resetWithoutLongArrray() {
+    if (consumer != null) {
+      // the call to consumer.allocateArray may trigger a spill which in turn access this instance
+      // and eventually re-enter this method and try to free the array again.  by setting the array
+      // to null and its length to 0 we effectively make the spill code-path a no-op.  setting the
+      // array to null also indicates that it has already been de-allocated which prevents a double
+      // de-allocation in free().
+      array = null;
+      usableCapacity = 0;
+      pos = 0;
+      nullBoundaryPos = 0;
+      array = consumer.allocateArray(initialSize);
+      usableCapacity = getUsableCapacity();
+    }
+    pos = 0;
+    nullBoundaryPos = 0;
   }
 
   public void reset() {
@@ -214,6 +238,10 @@ public final class UnsafeInMemorySorter {
 
   public LongArray getSortedArray() {
     getSortedIterator();
+    return array;
+  }
+
+  public LongArray getArray() {
     return array;
   }
 
@@ -346,6 +374,8 @@ public final class UnsafeInMemorySorter {
 
     @Override
     public long getKeyPrefix() { return keyPrefix; }
+
+    public int getPosition() { return position; }
 
     public long getCurrentRecordPointer() { return currentRecordPointer; }
   }

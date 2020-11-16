@@ -343,7 +343,7 @@ package object config {
       .createWithDefault(false)
 
   val MEMORY_EXTENDED_PATH =
-    ConfigBuilder("spark.memory.memory.extended.path")
+    ConfigBuilder("spark.memory.extended.path")
       .doc("intialize path for extended memory")
       .stringConf
       .createWithDefault("/mnt/pmem")

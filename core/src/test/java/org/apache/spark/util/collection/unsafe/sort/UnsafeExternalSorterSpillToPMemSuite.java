@@ -532,6 +532,8 @@ public class UnsafeExternalSorterSpillToPMemSuite {
         }
         // we expect an SparkOutOfMemoryError here, anything else (i.e the original NPE is a failure)
         catch (SparkOutOfMemoryError oom){
+            // to clean the sorted array in pMemWriter
+            sorter.cleanupResources();
             String oomStackTrace = Utils.exceptionString(oom);
             assertThat("expected SparkOutOfMemoryError in " +
                             "org.apache.spark.util.collection.unsafe.sort.UnsafeInMemorySorter.reset",

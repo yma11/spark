@@ -538,6 +538,7 @@ public class TaskMemoryManager {
 
     // release the memory that is not used by any consumer (acquired for pages in tungsten mode).
     memoryManager.releaseExecutionMemory(acquiredButNotUsed, taskAttemptId, tungstenMemoryMode);
+    memoryManager.releaseAllExtendedMemoryForTask(taskAttemptId);
 
     return memoryManager.releaseAllExecutionMemoryForTask(taskAttemptId);
   }

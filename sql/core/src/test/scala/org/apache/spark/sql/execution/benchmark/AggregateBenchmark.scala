@@ -511,7 +511,7 @@ object AggregateBenchmark extends SqlBasedBenchmark {
               Long.MaxValue / 2,
               1),
             0)
-          val map = new BytesToBytesMap(taskMemoryManager, 1024, 64L << 20)
+          val map = new BytesToBytesMap(taskMemoryManager, null, 1024, 64L << 20)
           val keyBytes = new Array[Byte](16)
           val valueBytes = new Array[Byte](16)
           val key = new UnsafeRow(1)
