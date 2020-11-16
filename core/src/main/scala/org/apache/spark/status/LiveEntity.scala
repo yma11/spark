@@ -149,6 +149,7 @@ private class LiveTask(
         metrics.memoryBytesSpilled,
         metrics.diskBytesSpilled,
         metrics.shuffleSpillWriteTime,
+        metrics.spillSortTime,
         metrics.shuffleSpillReadTime,
         metrics.shuffleSpillDeleteTime,
         metrics.peakExecutionMemory,
@@ -227,6 +228,7 @@ private class LiveTask(
       taskMetrics.memoryBytesSpilled,
       taskMetrics.diskBytesSpilled,
       taskMetrics.shuffleSpillWriteTime,
+      taskMetrics.spillSortTime,
       taskMetrics.shuffleSpillReadTime,
       taskMetrics.shuffleSpillDeleteTime,
       taskMetrics.peakExecutionMemory,
@@ -370,6 +372,7 @@ private class LiveExecutorStageSummary(
       metrics.memoryBytesSpilled,
       metrics.diskBytesSpilled,
       metrics.shuffleSpillWriteTime,
+      metrics.spillSortTime,
       metrics.shuffleSpillReadTime,
       metrics.shuffleSpillDeleteTime,
       isBlacklisted)
@@ -449,6 +452,7 @@ private class LiveStage extends LiveEntity {
       diskBytesSpilled = metrics.diskBytesSpilled,
 
       shuffleSpillWriteTime = metrics.shuffleSpillWriteTime,
+      spillSortTime = metrics.spillSortTime,
       shuffleSpillReadTime = metrics.shuffleSpillReadTime,
       shuffleSpillDeleteTime = metrics.shuffleSpillDeleteTime,
 
@@ -691,6 +695,7 @@ private[spark] object LiveEntityHelpers {
       memoryBytesSpilled: Long,
       diskBytesSpilled: Long,
       shuffleSpillWriteTime: Long,
+      spillSortTime: Long,
       shuffleSpillReadTime: Long,
       shuffleSpillDeleteTime: Long,
       peakExecutionMemory: Long,
@@ -719,6 +724,7 @@ private[spark] object LiveEntityHelpers {
       memoryBytesSpilled,
       diskBytesSpilled,
       shuffleSpillWriteTime,
+      spillSortTime,
       shuffleSpillReadTime,
       shuffleSpillDeleteTime,
       peakExecutionMemory,
@@ -745,7 +751,7 @@ private[spark] object LiveEntityHelpers {
 
   def createMetrics(default: Long): v1.TaskMetrics = {
     createMetrics(default, default, default, default, default, default, default, default,
-      default, default, default, default, default, default, default, default,
+      default, default, default, default, default, default, default, default, default,
       default, default, default, default, default, default, default, default,
       default, default, default)
   }
@@ -782,6 +788,7 @@ private[spark] object LiveEntityHelpers {
       updateMetricValue(m.memoryBytesSpilled),
       updateMetricValue(m.diskBytesSpilled),
       updateMetricValue(m.shuffleSpillWriteTime),
+      updateMetricValue(m.spillSortTime),
       updateMetricValue(m.shuffleSpillReadTime),
       updateMetricValue(m.shuffleSpillDeleteTime),
       updateMetricValue(m.peakExecutionMemory),
@@ -813,6 +820,7 @@ private[spark] object LiveEntityHelpers {
       m1.memoryBytesSpilled + m2.memoryBytesSpilled * mult,
       m1.diskBytesSpilled + m2.diskBytesSpilled * mult,
       m1.shuffleSpillWriteTime + m2.shuffleSpillWriteTime * mult,
+      m1.spillSortTime + m2.spillSortTime * mult,
       m1.shuffleSpillReadTime + m2.shuffleSpillReadTime * mult,
       m1.shuffleSpillDeleteTime + m2.shuffleSpillDeleteTime * mult,
       m1.peakExecutionMemory + m2.peakExecutionMemory * mult,

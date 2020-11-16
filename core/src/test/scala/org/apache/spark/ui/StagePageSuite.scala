@@ -82,9 +82,9 @@ class StagePageSuite extends SparkFunSuite with LocalSparkContext {
         shuffleWriteTime = 1L,
         shuffleWriteRecords = 1L,
         shuffleSpillWriteTime = 1L,
+        spillSortTime = 1L,
         shuffleSpillReadTime = 1L,
         shuffleSpillDeleteTime = 1L,
-
 
         name = "stage1",
         description = Some("description"),

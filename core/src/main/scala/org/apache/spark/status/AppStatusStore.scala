@@ -210,6 +210,7 @@ private[spark] class AppStatusStore(
         diskBytesSpilled = toValues(_.diskBytesSpilled),
 
         shuffleSpillWriteTime = toValues(_.shuffleSpillWriteTime),
+        spillSortTime = toValues(_.spillSortTime),
         shuffleSpillReadTime = toValues(_.shuffleSpillReadTime),
         shuffleSpillDeleteTime = toValues(_.shuffleSpillDeleteTime),
         inputMetrics = new v1.InputMetricDistributions(
@@ -291,10 +292,13 @@ private[spark] class AppStatusStore(
       diskBytesSpilled = scanTasks(TaskIndexNames.DISK_SPILL) { t => t.diskBytesSpilled },
       shuffleSpillWriteTime =
         scanTasks(TaskIndexNames.SHUFFLE_SPILL_WRITE_TIME) { t => t.shuffleSpillWriteTime },
+      spillSortTime =
+        scanTasks(TaskIndexNames.SPILL_SORT_TIME) { t => t.spillSortTime },
       shuffleSpillReadTime =
         scanTasks(TaskIndexNames.SHUFFLE_SPILL_READ_TIME) { t => t.shuffleSpillReadTime },
       shuffleSpillDeleteTime =
         scanTasks(TaskIndexNames.SHUFFLE_SPILL_DELETE_TIME) { t => t.shuffleSpillDeleteTime },
+
       inputMetrics = new v1.InputMetricDistributions(
         scanTasks(TaskIndexNames.INPUT_SIZE) { t => t.inputBytesRead },
         scanTasks(TaskIndexNames.INPUT_RECORDS) { t => t.inputRecordsRead }),
@@ -339,8 +343,10 @@ private[spark] class AppStatusStore(
           memoryBytesSpilled = computedQuantiles.memoryBytesSpilled(idx),
           diskBytesSpilled = computedQuantiles.diskBytesSpilled(idx),
           shuffleSpillWriteTime = computedQuantiles.shuffleSpillWriteTime(idx),
+          spillSortTime = computedQuantiles.spillSortTime(idx),
           shuffleSpillReadTime = computedQuantiles.shuffleSpillReadTime(idx),
           shuffleSpillDeleteTime = computedQuantiles.shuffleSpillDeleteTime(idx),
+
 
           bytesRead = computedQuantiles.inputMetrics.bytesRead(idx),
           recordsRead = computedQuantiles.inputMetrics.recordsRead(idx),
@@ -476,6 +482,7 @@ private[spark] class AppStatusStore(
       memoryBytesSpilled = stage.memoryBytesSpilled,
       diskBytesSpilled = stage.diskBytesSpilled,
       shuffleSpillWriteTime = stage.shuffleSpillWriteTime,
+      spillSortTime = stage.spillSortTime,
       shuffleSpillReadTime = stage.shuffleSpillReadTime,
       shuffleSpillDeleteTime = stage.shuffleSpillDeleteTime,
       peakExecutionMemory = stage.peakExecutionMemory,

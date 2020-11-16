@@ -78,6 +78,7 @@ class ExecutorStageSummary private[spark](
     val memoryBytesSpilled : Long,
     val diskBytesSpilled : Long,
     val shuffleSpillWriteTime : Long,
+    val spillSortTime: Long,
     val shuffleSpillReadTime : Long,
     val shuffleSpillDeleteTime : Long,
     val isBlacklistedForStage: Boolean)
@@ -230,6 +231,7 @@ class StageData private[spark](
     val memoryBytesSpilled: Long,
     val diskBytesSpilled: Long,
     val shuffleSpillWriteTime: Long,
+    val spillSortTime: Long,
     val shuffleSpillReadTime: Long,
     val shuffleSpillDeleteTime: Long,
     val peakExecutionMemory: Long,
@@ -292,6 +294,7 @@ class TaskMetrics private[spark](
     val memoryBytesSpilled: Long,
     val diskBytesSpilled: Long,
     val shuffleSpillWriteTime: Long,
+    val spillSortTime: Long,
     val shuffleSpillReadTime: Long,
     val shuffleSpillDeleteTime: Long,
     val peakExecutionMemory: Long,
@@ -338,6 +341,7 @@ class TaskMetricDistributions private[spark](
     val memoryBytesSpilled: IndexedSeq[Double],
     val diskBytesSpilled: IndexedSeq[Double],
     val shuffleSpillWriteTime: IndexedSeq[Double],
+    val spillSortTime: IndexedSeq[Double],
     val shuffleSpillReadTime: IndexedSeq[Double],
     val shuffleSpillDeleteTime: IndexedSeq[Double],
 

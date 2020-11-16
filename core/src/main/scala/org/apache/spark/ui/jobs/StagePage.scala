@@ -189,6 +189,10 @@ private[ui] class StagePage(parent: StagesTab, store: AppStatusStore) extends We
               <strong>Spill Write Time</strong>
               {s"${UIUtils.formatDuration(stageData.shuffleSpillWriteTime / 1000000)}"}
              </li>
+              <li>
+                <strong>Spill Sort Time</strong>
+                {s"${UIUtils.formatDuration(stageData.spillSortTime / 1000000)}"}
+              </li>
              <li>
                <strong>Spill Read Time</strong>
                {s"${UIUtils.formatDuration(stageData.shuffleSpillReadTime / 1000000)}"}
@@ -714,6 +718,13 @@ private[ui] class TaskPagedTable(
             },
             hideZero = true)
         }</td>
+          <td>{
+            formatDuration(
+              task.taskMetrics.map { m =>
+                TimeUnit.NANOSECONDS.toMillis(m.spillSortTime)
+              },
+              hideZero = true)
+            }</td>
         <td>{
           formatDuration(
             task.taskMetrics.map { m =>
@@ -789,6 +800,7 @@ private[spark] object ApiHelper {
   val HEADER_SHUFFLE_SPILL_WRITE_TIME = "Spill Write Time"
   val HEADER_SHUFFLE_SPILL_READ_TIME = "Spill Read Time"
   val HEADER_SHUFFLE_SPILL_DELETE_TIME = "Spill Delete Time"
+  val HEADER_SPILL_SORT_TIME = "Spill Sort Time"
   val HEADER_MEM_SPILL = "Spill (Memory)"
   val HEADER_DISK_SPILL = "Spill (Disk)"
   val HEADER_ERROR = "Errors"
@@ -820,6 +832,7 @@ private[spark] object ApiHelper {
     HEADER_SHUFFLE_WRITE_TIME -> TaskIndexNames.SHUFFLE_WRITE_TIME,
     HEADER_SHUFFLE_WRITE_SIZE -> TaskIndexNames.SHUFFLE_WRITE_SIZE,
     HEADER_SHUFFLE_SPILL_WRITE_TIME -> TaskIndexNames.SHUFFLE_SPILL_WRITE_TIME,
+    HEADER_SPILL_SORT_TIME -> TaskIndexNames.SPILL_SORT_TIME,
     HEADER_SHUFFLE_SPILL_READ_TIME -> TaskIndexNames.SHUFFLE_SPILL_READ_TIME,
     HEADER_SHUFFLE_SPILL_DELETE_TIME -> TaskIndexNames.SHUFFLE_SPILL_DELETE_TIME,
     HEADER_MEM_SPILL -> TaskIndexNames.MEM_SPILL,
