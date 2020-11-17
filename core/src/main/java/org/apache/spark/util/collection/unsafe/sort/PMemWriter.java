@@ -6,11 +6,15 @@ import org.apache.spark.memory.TaskMemoryManager;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.array.LongArray;
 import org.apache.spark.unsafe.memory.MemoryBlock;
+import org.apache.spark.util.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.LinkedList;
 
 public final class PMemWriter {
+    private static final Logger logger = LoggerFactory.getLogger(PMemWriter.class);
     private final ShuffleWriteMetrics writeMetrics;
     private final TaskMemoryManager taskMemoryManager;
     private final LinkedList<MemoryBlock> allocatedPMemPages = new LinkedList<>();
@@ -30,12 +34,15 @@ public final class PMemWriter {
     }
 
     public boolean dumpPageToPMem(MemoryBlock page) {
+        long dumpStartTime = System.nanoTime();
         MemoryBlock pMemBlock = taskMemoryManager.allocatePMemPage(page.size());
         if (pMemBlock != null) {
             Platform.copyMemory(page.getBaseObject(), page.getBaseOffset(), null, pMemBlock.getBaseOffset(), page.size());
             writeMetrics.incBytesWritten(page.size());
             allocatedPMemPages.add(pMemBlock);
             pageMap.put(page, pMemBlock);
+            System.out.println("page size: " + Utils.bytesToString(page.size())
+                    + " time: " + (System.nanoTime()-dumpStartTime)/1000000);
             return true;
         }
         return false;
@@ -63,7 +70,18 @@ public final class PMemWriter {
             sortedArray.set(position, pMemOffset);
             position += 2;
         }
-        this.sortedArray = sortedArray;
+        // copy the LongArray to PMem
+        MemoryBlock arrayBlock = sortedArray.memoryBlock();
+        MemoryBlock pMemBlock = taskMemoryManager.allocatePMemPage(arrayBlock.size());
+
+        if (pMemBlock != null) {
+            writeMetrics.incBytesWritten(pMemBlock.size());
+            allocatedPMemPages.add(pMemBlock);
+            Platform.copyMemory(arrayBlock.getBaseObject(), arrayBlock.getBaseOffset(), null, pMemBlock.getBaseOffset(), arrayBlock.size());
+            this.sortedArray = new LongArray(pMemBlock);
+        } else {
+            logger.error("fails to allocate PMem for LongArray");
+        }
     }
 
     public LongArray getSortedArray() {
