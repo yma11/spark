@@ -195,6 +195,8 @@ private[v1] class StagesResource extends BaseAppResource {
         || containsValue(UIUtils.formatDuration(
           task.taskMetrics.get.shuffleSpillWriteTime / 1000000))
         || containsValue(UIUtils.formatDuration(
+          task.taskMetrics.get.spillSortTime / 1000000))
+        || containsValue(UIUtils.formatDuration(
           task.taskMetrics.get.shuffleSpillReadTime / 1000000))
         || containsValue(UIUtils.formatDuration(
           task.taskMetrics.get.shuffleSpillDeleteTime / 1000000))

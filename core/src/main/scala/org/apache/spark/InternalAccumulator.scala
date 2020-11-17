@@ -42,6 +42,7 @@ private[spark] object InternalAccumulator {
   val SHUFFLE_SPILL_WRITE_TIME = METRICS_PREFIX + "shuffleSpillWriteTime"
   val SHUFFLE_SPILL_READ_TIME = METRICS_PREFIX + "shuffleSpillReadTime"
   val SHUFFLE_SPILL_DELETE_TIME = METRICS_PREFIX + "shuffleSpillDeleteTime"
+  val SPILL_SORT_TIME = METRICS_PREFIX + "spillSortTime"
   val PEAK_EXECUTION_MEMORY = METRICS_PREFIX + "peakExecutionMemory"
   val UPDATED_BLOCK_STATUSES = METRICS_PREFIX + "updatedBlockStatuses"
   val TEST_ACCUM = METRICS_PREFIX + "testAccumulator"

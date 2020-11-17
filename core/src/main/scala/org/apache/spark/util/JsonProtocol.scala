@@ -399,6 +399,7 @@ private[spark] object JsonProtocol {
     ("Memory Bytes Spilled" -> taskMetrics.memoryBytesSpilled) ~
     ("Disk Bytes Spilled" -> taskMetrics.diskBytesSpilled) ~
     ("Spill Write Time" -> taskMetrics.shuffleSpillWriteTime) ~
+    ("Spill Sort Time" -> taskMetrics.spillSortTime) ~
     ("Spill Read Time" -> taskMetrics.shuffleSpillReadTime) ~
     ("Spill Delete Time" -> taskMetrics.shuffleSpillDeleteTime) ~
     ("Shuffle Read Metrics" -> shuffleReadMetrics) ~
@@ -910,6 +911,7 @@ private[spark] object JsonProtocol {
     metrics.incMemoryBytesSpilled((json \ "Memory Bytes Spilled").extract[Long])
     metrics.incDiskBytesSpilled((json \ "Disk Bytes Spilled").extract[Long])
     metrics.incShuffleSpillWriteTime((json \ "Spill Write Time").extract[Long])
+    metrics.incSpillSortTime((json \ "Spill Sort Time").extract[Long])
     metrics.incShuffleSpillReadTime((json \ "Spill Read Time").extract[Long])
     metrics.incShuffleSpillDeleteTime((json \ "Spill Delete Time").extract[Long])
 
