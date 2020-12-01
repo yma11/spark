@@ -22,6 +22,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -229,11 +233,9 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       // records are not sorted before spill to PMem, may affected performance?
       final PMemWriter pMemSpillWriter = new PMemWriter(writeMetrics, taskContext.taskMetrics(),
               taskMemoryManager, inMemSorter.numRecords());
-      long sortTime = System.nanoTime();
-      UnsafeSorterIterator sortedIterator = inMemSorter.getSortedIterator();
-
-      sortDuration = System.nanoTime() - sortTime;
-      System.out.println("inMemSorter records: " + sortedIterator.getNumRecords());
+      // do sort in background
+      ExecutorService executorService = Executors.newSingleThreadExecutor();
+      Future<Long> future = executorService.submit(() -> sortBeforeSpill());
       long dumpTime = System.nanoTime();
       for (MemoryBlock page : allocatedPages) {
         if (!pMemSpillWriter.dumpPageToPMem(page)) {
@@ -241,7 +243,12 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         }
       }
       writeDuration = System.nanoTime() - dumpTime;
-
+      try {
+        sortDuration = future.get();
+      } catch (InterruptedException | ExecutionException e) {
+        e.printStackTrace();
+      }
+      executorService.shutdown();
       pMemSpillWriter.updateLongArray(inMemSorter.getArray(), inMemSorter.numRecords(), 0);
       // verify all records in inMemSoter are spilled in PMem
       assert(pMemSpillWriter.getNumRecordsWritten() == inMemSorter.numRecords());
@@ -251,7 +258,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       freeMemory();
 
     } else {
-    // fallback to disk spill if PMem spill is not enabled or space not enough
+      // fallback to disk spill if PMem spill is not enabled or space not enough
       final UnsafeSorterSpillWriter spillWriter =
               new UnsafeSorterSpillWriter(blockManager, fileBufferSizeBytes, writeMetrics,
                       inMemSorter.numRecords());
@@ -259,7 +266,6 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       long sortStartTime = System.nanoTime();
       UnsafeSorterIterator sortedIterator = inMemSorter.getSortedIterator();
       sortDuration = System.nanoTime() - sortStartTime;
-      System.out.println("inMemSorter records: " + sortedIterator.getNumRecords());
       long writeStartTime = System.nanoTime();
       spillIterator(sortedIterator, spillWriter);
       writeDuration = System.nanoTime() - writeStartTime;
@@ -282,6 +288,15 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
     taskContext.taskMetrics().incSpillSortTime(sortDuration);
     totalSpillBytes += spillSize;
     return spillSize;
+  }
+
+  private long sortBeforeSpill() {
+    long sortTime = System.nanoTime();
+    UnsafeSorterIterator sortedIterator = inMemSorter.getSortedIterator();
+
+    long sortDuration = System.nanoTime() - sortTime;
+    System.out.println("inMemSorter records: " + sortedIterator.getNumRecords());
+    return sortDuration;
   }
 
   /**
