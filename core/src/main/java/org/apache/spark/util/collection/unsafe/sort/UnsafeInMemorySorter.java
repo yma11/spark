@@ -377,6 +377,8 @@ public final class UnsafeInMemorySorter {
 
     public int getPosition() { return position; }
 
+    public int getOffset() { return offset; }
+
     public long getCurrentRecordPointer() { return currentRecordPointer; }
   }
 
@@ -421,4 +423,13 @@ public final class UnsafeInMemorySorter {
       return new SortedIterator(pos / 2, offset);
     }
   }
+
+  public LongArray getLongArray() {
+    return array;
+  }
+
+  public TaskMemoryManager getTaskMemoryManager() {
+    return memoryManager;
+  }
+
 }

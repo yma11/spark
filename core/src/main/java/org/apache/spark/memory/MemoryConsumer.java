@@ -129,10 +129,6 @@ public abstract class MemoryConsumer {
     taskMemoryManager.freePage(page, this);
   }
 
-  protected void freePMemPage(MemoryBlock page) {
-    taskMemoryManager.freePMemPage(page, this);
-  }
-
   /**
    * Allocates memory of `size`.
    */
@@ -161,5 +157,9 @@ public abstract class MemoryConsumer {
     throw new SparkOutOfMemoryError("Unable to acquire " + required + " bytes of memory, got " +
       got);
     // checkstyle.on: RegexpSinglelineJava
+  }
+
+  public TaskMemoryManager getTaskMemoryManager() {
+    return taskMemoryManager;
   }
 }

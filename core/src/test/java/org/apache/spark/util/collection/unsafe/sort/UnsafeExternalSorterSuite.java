@@ -145,7 +145,7 @@ public class UnsafeExternalSorterSuite {
     }
   }
 
-  private static void insertNumber(UnsafeExternalSorter sorter, int value) throws Exception {
+  protected static void insertNumber(UnsafeExternalSorter sorter, int value) throws Exception {
     final int[] arr = new int[]{ value };
     sorter.insertRecord(arr, Platform.INT_ARRAY_OFFSET, 4, value, false);
   }
@@ -157,7 +157,7 @@ public class UnsafeExternalSorterSuite {
     sorter.insertRecord(record, Platform.INT_ARRAY_OFFSET, record.length * 4, prefix, false);
   }
 
-  private UnsafeExternalSorter newSorter() throws IOException {
+  protected UnsafeExternalSorter newSorter() throws IOException {
     return UnsafeExternalSorter.create(
       taskMemoryManager,
       blockManager,
@@ -552,7 +552,7 @@ public class UnsafeExternalSorterSuite {
     }
   }
 
-  private void verifyIntIterator(UnsafeSorterIterator iter, int start, int end)
+  protected void verifyIntIterator(UnsafeSorterIterator iter, int start, int end)
       throws IOException {
     for (int i = start; i < end; i++) {
       assert (iter.hasNext());
