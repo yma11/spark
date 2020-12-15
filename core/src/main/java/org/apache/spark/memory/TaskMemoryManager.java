@@ -422,6 +422,72 @@ public class TaskMemoryManager {
   }
 
   /**
+   * @param size
+   * @return
+   */
+  public MemoryBlock allocatePMemPage(long size) {
+    if (size > MAXIMUM_PAGE_SIZE_BYTES) {
+      throw new TooLargePageException(size);
+    }
+    final int pageNumber;
+    synchronized (this) {
+      pageNumber = allocatedPages.nextClearBit(0);
+      if (pageNumber >= PAGE_TABLE_SIZE) {
+        releaseExtendedMemory(size);
+        throw new IllegalStateException(
+                "Have already allocated a maximum of " + PAGE_TABLE_SIZE + " pages");
+      }
+      allocatedPages.set(pageNumber);
+    }
+    MemoryBlock page = null;
+    try {
+      page = memoryManager.getUsablePMemPage(size);
+      if (page == null) {
+        page = memoryManager.extendedMemoryAllocator().allocate(size);
+        memoryManager.addPMemPages(page);
+      } else {
+        logger.debug("reuse pmem page.");
+      }
+    } catch (OutOfMemoryError e) {
+      logger.error("Failed to allocate a PMem page ({} bytes).", size);
+    }
+    if (page == null) {
+      return null;
+    }
+    page.isExtendedMemory(true);
+    page.pageNumber = pageNumber;
+    pageTable[pageNumber] = page;
+    if (logger.isTraceEnabled()) {
+      logger.trace("Allocate page number {} ({} bytes)", pageNumber, size);
+    }
+    return page;
+
+  }
+
+  public void freePMemPage(MemoryBlock page, MemoryConsumer consumer) {
+    assert (page.pageNumber != MemoryBlock.NO_PAGE_NUMBER) :
+            "Called freePage() on memory that wasn't allocated with allocatePage()";
+    assert (page.pageNumber != MemoryBlock.FREED_IN_ALLOCATOR_PAGE_NUMBER) :
+            "Called freePage() on a memory block that has already been freed";
+    assert (page.pageNumber != MemoryBlock.FREED_IN_TMM_PAGE_NUMBER) :
+            "Called freePage() on a memory block that has already been freed";
+    assert(allocatedPages.get(page.pageNumber));
+    pageTable[page.pageNumber] = null;
+    synchronized (this) {
+      allocatedPages.clear(page.pageNumber);
+    }
+    if (logger.isTraceEnabled()) {
+      logger.trace("Freed PMem page number {} ({} bytes)", page.pageNumber, page.size());
+    }
+    // Clear the page number before passing the block to the MemoryAllocator's free().
+    // Doing this allows the MemoryAllocator to detect when a TaskMemoryManager-managed
+    // page has been inappropriately directly freed without calling TMM.freePage().
+
+    page.pageNumber = MemoryBlock.FREED_IN_TMM_PAGE_NUMBER;
+    // not really free the PMem page for future page reuse
+  }
+
+  /**
    * Given a memory page and offset within that page, encode this address into a 64-bit long.
    * This address will remain valid as long as the corresponding page has not been freed.
    *

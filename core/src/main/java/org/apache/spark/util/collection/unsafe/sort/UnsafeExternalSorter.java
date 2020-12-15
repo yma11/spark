@@ -91,7 +91,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
    */
   private final LinkedList<MemoryBlock> allocatedPages = new LinkedList<>();
 
-  private final LinkedList<SpillWriterForUnsafeSorter> spillWriters = new LinkedList<SpillWriterForUnsafeSorter>();
+  private final LinkedList<SpillWriterForUnsafeSorter> spillWriters = new LinkedList<>();
 
   // These variables are reset after spilling:
   @Nullable private volatile UnsafeInMemorySorter inMemSorter;
@@ -227,15 +227,8 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         spillWriters.size() > 1 ? " times" : " time");
     long spillSize = 0;
     ShuffleWriteMetrics writeMetrics = new ShuffleWriteMetrics();
-    UnsafeSorterIterator sortedIterator = inMemSorter.getSortedIterator();
-    // assure there is enough PMem space for this spill first
-    long startTime = System.nanoTime();
-    long duration;
-    // firstly try to spill to PMem if spark.memory.spill.pmem.enabled set to true
-    long required = getMemoryUsage();
-
-    spillWithWriter(sortedIterator, sortedIterator.getNumRecords(), writeMetrics);
-    duration = System.nanoTime() - startTime;
+    // Sorting records or not will be handled by different spill writer, here null is given instead.
+    spillWithWriter(null, inMemSorter.numRecords(), writeMetrics, false);
     spillSize += freeMemory();
     inMemSorter.reset();
     // Note that this is more-or-less going to be a multiple of the page size, so wasted space in
@@ -246,12 +239,16 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
     // pages, we might not be able to get memory for the pointer array.
     taskContext.taskMetrics().incMemoryBytesSpilled(spillSize);
     taskContext.taskMetrics().incDiskBytesSpilled(writeMetrics.bytesWritten());
-    taskContext.taskMetrics().incShuffleSpillWriteTime(duration);
     totalSpillBytes += spillSize;
     return spillSize;
   }
+
   //Todo: It's confusing to pass in ShuffleWriteMetrics here. Will reconsider and fix it later
-  public SpillWriterForUnsafeSorter spillWithWriter(UnsafeSorterIterator sortedIterator, int numberOfRecordsToWritten, ShuffleWriteMetrics writeMetrics) throws IOException {
+  public SpillWriterForUnsafeSorter spillWithWriter(
+          UnsafeSorterIterator sortedIterator,
+          int numberOfRecordsToWritten,
+          ShuffleWriteMetrics writeMetrics,
+          boolean isSorted) throws IOException {
     PMemSpillWriterType writerType = PMemSpillWriterType.valueOf(spillWriterType);
     logger.info("PMemSpillWriterType:{}",writerType.toString());
     final SpillWriterForUnsafeSorter spillWriter = PMemSpillWriterFactory.getSpillWriter(
@@ -264,11 +261,13 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         fileBufferSizeBytes,
         writeMetrics,
         taskContext.taskMetrics(),
-        spillToPMemEnabled);
-    spillWriters.add(spillWriter);
+        spillToPMemEnabled,
+        isSorted);
     spillWriter.write();
+    spillWriters.add(spillWriter);
     return spillWriter;
   }
+
   /**
    * Return the total memory usage of this sorter, including the data pages and the sorter's pointer
    * array.
@@ -549,7 +548,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         long required = getMemoryUsage();
         long startTime = System.nanoTime();
         long released = 0L;
-        SpillWriterForUnsafeSorter spillWriter = spillWithWriter(upstream, numRecords, writeMetrics);
+        SpillWriterForUnsafeSorter spillWriter = spillWithWriter(upstream, numRecords, writeMetrics, true);
         nextUpstream = spillWriter.getSpillReader();
 
         released += inMemSorter.getMemoryUsage();
