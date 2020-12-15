@@ -449,9 +449,7 @@ public class TaskMemoryManager {
         logger.debug("reuse pmem page.");
       }
     } catch (OutOfMemoryError e) {
-      logger.error("Failed to allocate a PMem page ({} bytes).", size);
-    }
-    if (page == null) {
+      logger.debug("Failed to allocate a PMem page ({} bytes).", size);
       return null;
     }
     page.isExtendedMemory(true);

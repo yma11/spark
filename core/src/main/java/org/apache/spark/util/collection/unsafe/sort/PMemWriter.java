@@ -159,6 +159,7 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
 
     @Override
     public UnsafeSorterIterator getSpillReader() throws IOException {
+        // TODO: consider partial spill to PMem + Disk.
         if (diskSpillWriter != null) {
             return diskSpillWriter.getSpillReader();
         } else {
@@ -168,11 +169,13 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
 
     public void clearAll() {
         freeAllPMemPages();
+        if (diskSpillWriter != null) {
+            diskSpillWriter.clearAll();
+        }
     }
 
     @Override
     public int recordsSpilled() {
-        //todo: implements recordsSpill here.
         return numberOfRecordsToWritten;
     }
 
