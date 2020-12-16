@@ -36,38 +36,56 @@ public class PMemSpillWriterFactory {
             int fileBufferSize,
             ShuffleWriteMetrics writeMetrics,
             TaskMetrics taskMetrics,
-            boolean spillToPMEMEnabled) throws IOException {
-        if(spillToPMEMEnabled && sortedIterator instanceof UnsafeInMemorySorter.SortedIterator) {
+            boolean spillToPMEMEnabled,
+            boolean isSorted) throws IOException {
+        if (spillToPMEMEnabled && writerType == PMemSpillWriterType.MEM_COPY_ALL_DATA_PAGES_TO_PMEM_WITHLONGARRAY){
             SortedIteratorForSpills sortedSpillIte = SortedIteratorForSpills.createFromExistingSorterIte(
                     (UnsafeInMemorySorter.SortedIterator)sortedIterator,
                     externalSorter.getInMemSorter());
-            if (writerType == PMemSpillWriterType.WRITE_SORTED_RECORDS_TO_PMEM) {
-                return new SortedPMemPageSpillWriter(
-                        externalSorter,
-                        sortedSpillIte,
-                        numberOfRecordsToWritten,
-                        serializerManager,
+            return new PMemWriter(
+                    externalSorter,
+                    sortedSpillIte,
+                    isSorted,
+                    numberOfRecordsToWritten,
+                    serializerManager,
+                    blockManager,
+                    fileBufferSize,
+                    writeMetrics,
+                    taskMetrics);
+        } else {
+            if (sortedIterator == null) {
+                try {
+                    sortedIterator = externalSorter.getSortedIterator();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (spillToPMEMEnabled && sortedIterator instanceof UnsafeInMemorySorter.SortedIterator){
+                SortedIteratorForSpills sortedSpillIte = SortedIteratorForSpills.createFromExistingSorterIte(
+                        (UnsafeInMemorySorter.SortedIterator)sortedIterator,
+                        externalSorter.getInMemSorter());
+                if (writerType == PMemSpillWriterType.WRITE_SORTED_RECORDS_TO_PMEM) {
+                    return new SortedPMemPageSpillWriter(
+                            externalSorter,
+                            sortedSpillIte,
+                            numberOfRecordsToWritten,
+                            serializerManager,
+                            blockManager,
+                            fileBufferSize,
+                            writeMetrics,
+                            taskMetrics);
+                }
+            } else {
+                return new UnsafeSorterSpillWriter(
                         blockManager,
                         fileBufferSize,
-                        writeMetrics,
-                        taskMetrics);
-            } else if (writerType == PMemSpillWriterType.MEM_COPY_ALL_DATA_PAGES_TO_PMEM_WITHLONGARRAY){
-                new PMemWriter(
-                        externalSorter,
-                        sortedSpillIte,
+                        sortedIterator,
                         numberOfRecordsToWritten,
+                        serializerManager,
                         writeMetrics,
                         taskMetrics);
             }
-        } else {
-            return new UnsafeSorterSpillWriter(
-                    blockManager,
-                    fileBufferSize,
-                    sortedIterator,
-                    numberOfRecordsToWritten,
-                    serializerManager,
-                    writeMetrics,
-                    taskMetrics);
+
         }
         return null;
     }

@@ -81,4 +81,5 @@ public abstract class UnsafeSorterPMemSpillWriter implements SpillWriterForUnsaf
         }
         allocatedPMemPages.clear();
     }
+    public abstract UnsafeSorterIterator getSpillReader() throws IOException;
 }

@@ -34,7 +34,7 @@ public class UnsafeExternalSorterSpillWriterSuite extends UnsafeExternalSorterSu
         UnsafeInMemorySorter inMemSorter = sorter.getInMemSorter();
         UnsafeSorterIterator sortedIte = inMemSorter.getSortedIterator();
         if (sortedIte instanceof UnsafeInMemorySorter.SortedIterator) {
-            SpillWriterForUnsafeSorter pMemWriter = sorter.spillWithWriter(sortedIte, sortedIte.getNumRecords(),writeMetrics);
+            SpillWriterForUnsafeSorter pMemWriter = sorter.spillWithWriter(sortedIte, sortedIte.getNumRecords(),writeMetrics, true);
             UnsafeSorterIterator pMemReader = pMemWriter.getSpillReader();
             verifyIntIterator(pMemReader, 0, 100);
         }

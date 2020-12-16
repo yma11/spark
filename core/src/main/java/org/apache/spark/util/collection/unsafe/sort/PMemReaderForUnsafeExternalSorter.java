@@ -77,5 +77,4 @@ public final class PMemReaderForUnsafeExternalSorter extends UnsafeSorterIterato
     public void close() {
         // do nothing here
     }
-    public int getNumRecordsRemaining() { return numRecordsRemaining; }
 }

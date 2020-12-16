@@ -56,6 +56,9 @@ public class SortedIteratorForSpills extends UnsafeSorterIterator {
     public static SortedIteratorForSpills createFromExistingSorterIte(
             UnsafeInMemorySorter.SortedIterator sortedIte,
             UnsafeInMemorySorter inMemSorter) {
+        if (sortedIte == null) {
+            return null;
+        }
         TaskMemoryManager taskMemoryManager = inMemSorter.getTaskMemoryManager();
         LongArray array = inMemSorter.getLongArray();
         int numberRecords = sortedIte.getNumRecords();
@@ -130,4 +133,6 @@ public class SortedIteratorForSpills extends UnsafeSorterIterator {
     public long getKeyPrefix() { return keyPrefix; }
 
     public LongArray getLongArray() { return sortedArray; }
+
+    public int getPosition() { return position; }
 }

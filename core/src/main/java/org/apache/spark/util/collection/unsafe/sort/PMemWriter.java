@@ -19,80 +19,125 @@ package org.apache.spark.util.collection.unsafe.sort;
 
 import org.apache.spark.executor.ShuffleWriteMetrics;
 import org.apache.spark.executor.TaskMetrics;
+import org.apache.spark.serializer.SerializerManager;
+import org.apache.spark.storage.BlockManager;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.array.LongArray;
 import org.apache.spark.unsafe.memory.MemoryBlock;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedList;
 
 /**
- * Todo: the logic in this spill writer is moved from previous implementation in UnsafeExternalSorter
- * Need to check whether it's still correct later.
+ * In this writer, records page along with LongArray page are both dumped to PMem when spill happens
  */
 public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
     private LongArray sortedArray;
-    private HashMap<MemoryBlock, MemoryBlock> pageMap = new HashMap<MemoryBlock, MemoryBlock>();
-    private int numRecordsWritten;
+    private HashMap<MemoryBlock, MemoryBlock> pageMap = new HashMap<>();
     private int position;
     private LinkedList<MemoryBlock> allocatedDramPages;
+    private MemoryBlock pMemPageForLongArray;
+    private UnsafeSorterSpillWriter diskSpillWriter;
+    private BlockManager blockManager;
+    private SerializerManager serializerManager;
+    private int fileBufferSize;
+    private boolean isSorted;
+    private int totalRecordsWritten;
 
     public PMemWriter(
             UnsafeExternalSorter externalSorter,
             SortedIteratorForSpills sortedIterator,
-            int numRecordsToWritten,
+            boolean isSorted,
+            int numberOfRecordsToWritten,
+            SerializerManager serializerManager,
+            BlockManager blockManager,
+            int fileBufferSize,
             ShuffleWriteMetrics writeMetrics,
             TaskMetrics taskMetrics) {
-        super(externalSorter, sortedIterator, numRecordsToWritten, writeMetrics, taskMetrics);
-        this.numRecordsWritten = sortedIterator.getNumRecords();
+        // SortedIterator is null or readingIterator from UnsafeExternalSorter.
+        // But it isn't used in this PMemWriter, only for keep same constructor with other spill writers.
+        super(externalSorter, sortedIterator, numberOfRecordsToWritten, writeMetrics, taskMetrics);
         this.allocatedDramPages = externalSorter.getAllocatedPages();
-        this.sortedArray = sortedIterator.getLongArray();
-    }
-
-    private boolean dumpPageToPMem(MemoryBlock page) {
-        MemoryBlock pMemBlock = allocatePMemPage(page.size());
-        if (pMemBlock != null) {
-            Platform.copyMemory(page.getBaseObject(), page.getBaseOffset(), null, pMemBlock.getBaseOffset(), page.size());
-            writeMetrics.incBytesWritten(page.size());
-            pageMap.put(page, pMemBlock);
-            return true;
-        }
-        return false;
-    }
-
-    public int getNumRecordsWritten() {
-        return numRecordsWritten;
-    }
-
-    public PMemReaderForUnsafeExternalSorter getPMemReaderForUnsafeExternalSorter() {
-        return new PMemReaderForUnsafeExternalSorter(sortedArray, position, numRecordsWritten, taskMetrics);
+        this.blockManager = blockManager;
+        this.serializerManager = serializerManager;
+        this.fileBufferSize = fileBufferSize;
+        this.isSorted = isSorted;
+        // In the case that spill happens when iterator isn't sorted yet, the valid records
+        // will be [0, inMemsorter.numRecords]. When iterator is sorted, the valid records will be
+        // [position/2, inMemsorter.numRecords]
+        this.totalRecordsWritten = externalSorter.getInMemSorter().numRecords();
     }
 
     @Override
-    public void write() {
-        long dumpTime = System.nanoTime();
-        for (MemoryBlock page : allocatedDramPages) {
-            dumpPageToPMem(page);
+    public void write() throws IOException {
+        // write records based on externalsorter
+        // try to allocate all needed PMem pages before spill to PMem
+        UnsafeInMemorySorter inMemSorter = externalSorter.getInMemSorter();
+        if (allocatePMemPages(allocatedDramPages, inMemSorter.getArray().memoryBlock())) {
+            // TODO: add concurrent sort and write here
+            // write data pages
+            long writeStartTime = System.nanoTime();
+            for (MemoryBlock page : allocatedDramPages) {
+                dumpPageToPMem(page);
+            }
+            taskMetrics.incShuffleSpillWriteTime(System.nanoTime() - writeStartTime);
+            // get sorted iterator
+            if (!isSorted) {
+                long sortStartTime = System.nanoTime();
+                externalSorter.getInMemSorter().getSortedIterator();
+                taskMetrics.incSpillSortTime(System.nanoTime() - sortStartTime);
+                // update LongArray
+                updateLongArray(inMemSorter.getArray(), totalRecordsWritten, 0);
+            } else {
+                assert(sortedIterator != null);
+                updateLongArray(inMemSorter.getArray(), totalRecordsWritten, sortedIterator.getPosition());
+            }
+        } else {
+            // fallback to disk spill
+            if (diskSpillWriter == null) {
+                diskSpillWriter = new UnsafeSorterSpillWriter(
+                        blockManager,
+                        fileBufferSize,
+                        sortedIterator,
+                        numberOfRecordsToWritten,
+                        serializerManager,
+                        writeMetrics,
+                        taskMetrics);
+            }
+            diskSpillWriter.write(false);
         }
-        long dumpDuration = System.nanoTime() - dumpTime;
-        System.out.println("dump time : " + dumpDuration / 1000000);
-        long sortTime = System.nanoTime();
-        updateLongArray(numRecordsWritten, 0);
-        long sortDuration = System.nanoTime() - sortTime;
-        System.out.println("sort time : " + sortDuration / 1000000);
     }
 
-    @Override
-    public UnsafeSorterIterator getSpillReader() {
-        return new PMemReaderForUnsafeExternalSorter(sortedArray, position, numRecordsWritten, taskMetrics);
+    public boolean allocatePMemPages(LinkedList<MemoryBlock> dramPages, MemoryBlock longArrayPage) {
+        for (MemoryBlock page: dramPages) {
+            MemoryBlock pMemBlock = taskMemoryManager.allocatePMemPage(page.size());
+            if (pMemBlock != null) {
+                allocatedPMemPages.add(pMemBlock);
+                pageMap.put(page, pMemBlock);
+            } else {
+                pageMap.clear();
+                return false;
+            }
+        }
+        pMemPageForLongArray = taskMemoryManager.allocatePMemPage(longArrayPage.size());
+        if (pMemPageForLongArray != null) {
+            allocatedPMemPages.add(pMemPageForLongArray);
+            pageMap.put(longArrayPage, pMemPageForLongArray);
+        } else {
+            pageMap.clear();
+            return false;
+        }
+        return (allocatedPMemPages.size() == dramPages.size() + 1);
     }
 
-    public void clearAll() {
-        externalSorter.freeArray(sortedArray);
-        freeAllPMemPages();
+    private void dumpPageToPMem(MemoryBlock page) {
+        MemoryBlock pMemBlock = pageMap.get(page);
+        Platform.copyMemory(page.getBaseObject(), page.getBaseOffset(), null, pMemBlock.getBaseOffset(), page.size());
+        writeMetrics.incBytesWritten(page.size());
     }
 
-    private void updateLongArray(int numRecords, int position) {
+    public void updateLongArray(LongArray sortedArray, int numRecords, int position) {
         this.position = position;
         while (position < numRecords * 2){
             // update recordPointer in this array
@@ -104,12 +149,41 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
             sortedArray.set(position, pMemOffset);
             position += 2;
         }
-        this.sortedArray = sortedArray;
+        // copy the LongArray to PMem
+        MemoryBlock arrayBlock = sortedArray.memoryBlock();
+        MemoryBlock pMemBlock = pageMap.get(arrayBlock);
+        Platform.copyMemory(arrayBlock.getBaseObject(), arrayBlock.getBaseOffset(), null, pMemBlock.getBaseOffset(), arrayBlock.size());
+        writeMetrics.incBytesWritten(pMemBlock.size());
+        this.sortedArray = new LongArray(pMemBlock);
+    }
+
+    @Override
+    public UnsafeSorterIterator getSpillReader() throws IOException {
+        // TODO: consider partial spill to PMem + Disk.
+        if (diskSpillWriter != null) {
+            return diskSpillWriter.getSpillReader();
+        } else {
+            return new PMemReaderForUnsafeExternalSorter(sortedArray, position, totalRecordsWritten, taskMetrics);
+        }
+    }
+
+    public void clearAll() {
+        freeAllPMemPages();
+        if (diskSpillWriter != null) {
+            diskSpillWriter.clearAll();
+        }
     }
 
     @Override
     public int recordsSpilled() {
-        //todo: implements recordsSpill here.
-        return 0;
+        return numberOfRecordsToWritten;
+    }
+
+    @Override
+    public void freeAllPMemPages() {
+        for( MemoryBlock page: allocatedPMemPages) {
+            taskMemoryManager.freePMemPage(page, externalSorter);
+        }
+        allocatedPMemPages.clear();
     }
 }

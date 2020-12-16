@@ -18,7 +18,6 @@
 package org.apache.spark.memory
 
 import javax.annotation.concurrent.GuardedBy
-
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
@@ -26,7 +25,9 @@ import org.apache.spark.storage.BlockId
 import org.apache.spark.storage.memory.MemoryStore
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.array.ByteArrayMethods
-import org.apache.spark.unsafe.memory.MemoryAllocator
+import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
+
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * An abstract memory manager that enforces how memory is shared between execution and storage.
@@ -69,6 +70,11 @@ private[spark] abstract class MemoryManager(
   protected[this] val extendedMemorySize = conf.get(MEMORY_EXTENDED_SIZE)
   extendedMemoryPool.incrementPoolSize((extendedMemorySize * 0.9).toLong)
 
+  private[memory] var _pMemPages = new ArrayBuffer[MemoryBlock];
+
+  private[memory] def pMemPages: ArrayBuffer[MemoryBlock] = {
+    _pMemPages
+  }
   /**
    * Total available on heap memory for storage, in bytes. This amount can vary over time,
    * depending on the MemoryManager implementation.
@@ -203,6 +209,29 @@ private[spark] abstract class MemoryManager(
     extendedMemoryPool.releaseAllMemoryForTask(taskAttemptId)
   }
 
+  def addPMemPages(pMemPage: MemoryBlock): Unit = synchronized {
+    pMemPages.append(pMemPage);
+  }
+
+  def freeAllPMemPages(): Unit = synchronized {
+    for (pMemPage <- pMemPages) {
+      extendedMemoryAllocator.free(pMemPage);
+    }
+  }
+
+  /**
+    * @param size size of current page request
+    * @return PMem Page that suits for current page request
+    */
+  def getUsablePMemPage(size : Long): MemoryBlock = synchronized {
+    for (pMemPage <- pMemPages) {
+      if (pMemPage.pageNumber == MemoryBlock.FREED_IN_TMM_PAGE_NUMBER &&
+        pMemPage.size() == size) {
+        return pMemPage;
+      }
+    }
+    return null;
+  }
   /**
    * Execution memory currently in use, in bytes.
    */

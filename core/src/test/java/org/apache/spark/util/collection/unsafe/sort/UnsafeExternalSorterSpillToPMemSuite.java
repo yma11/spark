@@ -130,6 +130,7 @@ public class UnsafeExternalSorterSpillToPMemSuite {
     }
 
     private void assertSpillFilesWereCleanedUp() {
+        memoryManager.freeAllPMemPages();
         for (File spillFile : spillFilesCreated) {
             assertFalse("Spill file " + spillFile.getPath() + " was not cleaned up",
                     spillFile.exists());
