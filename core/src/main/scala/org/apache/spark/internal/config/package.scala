@@ -356,8 +356,8 @@ package object config {
     .checkValue(_ >= 0, "The extended memory size must not be negative")
     .createWithDefault(64 * 1024 * 1024)
 
-  val MEMORY_SPILL_PMEM_CONCURRENT =
-    ConfigBuilder("spark.memory.spill.pmem.concurrent")
+  val MEMORY_SPILL_PMEM_SORT_BACKGROUND =
+    ConfigBuilder("spark.memory.spill.pmem.sort.background")
       .doc("Doing sort and dump pages to PMem concurrently")
       .booleanConf
       .createWithDefault(false)

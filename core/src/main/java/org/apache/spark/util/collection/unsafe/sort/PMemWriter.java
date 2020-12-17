@@ -54,7 +54,7 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
     private boolean isSorted;
     private int totalRecordsWritten;
     private final boolean spillToPMemConcurrently = SparkEnv.get() != null && (boolean) SparkEnv.get().conf().get(
-            package$.MODULE$.MEMORY_SPILL_PMEM_CONCURRENT());
+            package$.MODULE$.MEMORY_SPILL_PMEM_SORT_BACKGROUND());
     public PMemWriter(
             UnsafeExternalSorter externalSorter,
             SortedIteratorForSpills sortedIterator,
@@ -96,7 +96,7 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
                 try {
                     writeDuration = future.get();
                 } catch (InterruptedException | ExecutionException e) {
-                    e.printStackTrace();
+                    logger.error(e.getMessage());
                 }
                 executorService.shutdownNow();
                 startTime = System.nanoTime();
@@ -160,6 +160,7 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
         }
         return (allocatedPMemPages.size() == dramPages.size() + 1);
     }
+
     private long dumpPagesToPMem() {
         long dumpTime = System.nanoTime();
         for (MemoryBlock page : allocatedDramPages) {
