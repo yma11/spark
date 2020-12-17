@@ -225,11 +225,10 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         Utils.bytesToString(getMemoryUsage()),
         spillWriters.size() ,
         spillWriters.size() > 1 ? " times" : " time");
-    long spillSize = 0;
     ShuffleWriteMetrics writeMetrics = new ShuffleWriteMetrics();
     // Sorting records or not will be handled by different spill writer, here null is given instead.
     spillWithWriter(null, inMemSorter.numRecords(), writeMetrics, false);
-    spillSize += freeMemory();
+    final long spillSize = freeMemory();
     inMemSorter.reset();
     // Note that this is more-or-less going to be a multiple of the page size, so wasted space in
     // pages will currently be counted as memory spilled even though that space isn't actually
@@ -545,18 +544,10 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         }
         
         ShuffleWriteMetrics writeMetrics = new ShuffleWriteMetrics();
-        long required = getMemoryUsage();
-        long startTime = System.nanoTime();
         long released = 0L;
         SpillWriterForUnsafeSorter spillWriter = spillWithWriter(upstream, numRecords, writeMetrics, true);
         nextUpstream = spillWriter.getSpillReader();
 
-        released += inMemSorter.getMemoryUsage();
-        totalSortTimeNanos += inMemSorter.getSortTimeNanos();
-        //FIXME need to check whether to free long array
-        inMemSorter.free();
-
-        long duration = System.nanoTime() - startTime;
         synchronized (UnsafeExternalSorter.this) {
           // release the pages except the one that is used. There can still be a caller that
           // is accessing the current record. We free this page in that caller's next loadNext()
@@ -581,7 +572,6 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
         inMemSorter = null;
         taskContext.taskMetrics().incMemoryBytesSpilled(released);
         taskContext.taskMetrics().incDiskBytesSpilled(writeMetrics.bytesWritten());
-        taskContext.taskMetrics().incShuffleSpillWriteTime(duration);
         totalSpillBytes += released;
         return released;
       }

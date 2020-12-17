@@ -17,22 +17,31 @@
 
 package org.apache.spark.util.collection.unsafe.sort;
 
+import org.apache.spark.SparkEnv;
 import org.apache.spark.executor.ShuffleWriteMetrics;
 import org.apache.spark.executor.TaskMetrics;
+import org.apache.spark.internal.config.package$;
 import org.apache.spark.serializer.SerializerManager;
 import org.apache.spark.storage.BlockManager;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.array.LongArray;
 import org.apache.spark.unsafe.memory.MemoryBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * In this writer, records page along with LongArray page are both dumped to PMem when spill happens
  */
 public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
+    private static final Logger logger = LoggerFactory.getLogger(PMemWriter.class);
     private LongArray sortedArray;
     private HashMap<MemoryBlock, MemoryBlock> pageMap = new HashMap<>();
     private int position;
@@ -44,7 +53,8 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
     private int fileBufferSize;
     private boolean isSorted;
     private int totalRecordsWritten;
-
+    private final boolean spillToPMemConcurrently = SparkEnv.get() != null && (boolean) SparkEnv.get().conf().get(
+            package$.MODULE$.MEMORY_SPILL_PMEM_SORT_BACKGROUND());
     public PMemWriter(
             UnsafeExternalSorter externalSorter,
             SortedIteratorForSpills sortedIterator,
@@ -75,23 +85,41 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
         // try to allocate all needed PMem pages before spill to PMem
         UnsafeInMemorySorter inMemSorter = externalSorter.getInMemSorter();
         if (allocatePMemPages(allocatedDramPages, inMemSorter.getArray().memoryBlock())) {
-            // TODO: add concurrent sort and write here
-            // write data pages
-            long writeStartTime = System.nanoTime();
-            for (MemoryBlock page : allocatedDramPages) {
-                dumpPageToPMem(page);
-            }
-            taskMetrics.incShuffleSpillWriteTime(System.nanoTime() - writeStartTime);
-            // get sorted iterator
-            if (!isSorted) {
-                long sortStartTime = System.nanoTime();
+            if (spillToPMemConcurrently && !isSorted) {
+                logger.info("Concurrent PMem write/records sort");
+                long writeDuration = 0;
+                ExecutorService executorService = Executors.newSingleThreadExecutor();
+                Future<Long> future = executorService.submit(()->dumpPagesToPMem());
+                long startTime = System.nanoTime();
                 externalSorter.getInMemSorter().getSortedIterator();
-                taskMetrics.incSpillSortTime(System.nanoTime() - sortStartTime);
-                // update LongArray
+                taskMetrics.incSpillSortTime(System.nanoTime() - startTime);
+                try {
+                    writeDuration = future.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    logger.error(e.getMessage());
+                }
+                executorService.shutdownNow();
+                startTime = System.nanoTime();
                 updateLongArray(inMemSorter.getArray(), totalRecordsWritten, 0);
+                taskMetrics.incShuffleSpillWriteTime(writeDuration
+                        + System.nanoTime() - startTime);
+            } else if(!isSorted) {
+                taskMetrics.incShuffleSpillWriteTime(dumpPagesToPMem());
+                // get sorted iterator
+                long startTime = System.nanoTime();
+                externalSorter.getInMemSorter().getSortedIterator();
+                taskMetrics.incSpillSortTime(System.nanoTime() - startTime);
+                // update LongArray
+                startTime = System.nanoTime();
+                updateLongArray(inMemSorter.getArray(), totalRecordsWritten, 0);
+                taskMetrics.incShuffleSpillWriteTime(System.nanoTime() - startTime);
             } else {
+                taskMetrics.incShuffleSpillWriteTime(dumpPagesToPMem());
+                // get sorted iterator
+                long startTime = System.nanoTime();
                 assert(sortedIterator != null);
                 updateLongArray(inMemSorter.getArray(), totalRecordsWritten, sortedIterator.getPosition());
+                taskMetrics.incShuffleSpillWriteTime(System.nanoTime() - startTime);
             }
         } else {
             // fallback to disk spill
@@ -105,7 +133,9 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
                         writeMetrics,
                         taskMetrics);
             }
+            long startTime = System.nanoTime();
             diskSpillWriter.write(false);
+            taskMetrics.incShuffleSpillWriteTime(System.nanoTime() - startTime);
         }
     }
 
@@ -129,6 +159,16 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
             return false;
         }
         return (allocatedPMemPages.size() == dramPages.size() + 1);
+    }
+
+    private long dumpPagesToPMem() {
+        long dumpTime = System.nanoTime();
+        for (MemoryBlock page : allocatedDramPages) {
+            dumpPageToPMem(page);
+        }
+        long dumpDuration = System.nanoTime() - dumpTime;
+        return dumpDuration;
+
     }
 
     private void dumpPageToPMem(MemoryBlock page) {
