@@ -356,6 +356,12 @@ package object config {
     .checkValue(_ >= 0, "The extended memory size must not be negative")
     .createWithDefault(64 * 1024 * 1024)
 
+  val MEMORY_SPILL_PMEM_CONCURRENT =
+    ConfigBuilder("spark.memory.spill.pmem.concurrent")
+      .doc("Doing sort and dump pages to PMem concurrently")
+      .booleanConf
+      .createWithDefault(false)
+
   val USAFE_EXTERNAL_SORTER_SPILL_WRITE_TYPE = ConfigBuilder("spark.unsafe.sort.spillwriter.type")
     .doc("The spill writer type for UnsafeExteranlSorter")
     .stringConf
