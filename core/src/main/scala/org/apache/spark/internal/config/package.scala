@@ -362,6 +362,12 @@ package object config {
       .booleanConf
       .createWithDefault(false)
 
+  val MEMORY_SPILL_PMEM_CLFLUSH_ENABLED =
+    ConfigBuilder("spark.memory.spill.pmem.clflush.enabled")
+      .doc("Enable clflush when copy to PMEM.")
+      .booleanConf
+      .createWithDefault(false)
+
   val USAFE_EXTERNAL_SORTER_SPILL_WRITE_TYPE = ConfigBuilder("spark.unsafe.sort.spillwriter.type")
     .doc("The spill writer type for UnsafeExteranlSorter")
     .stringConf

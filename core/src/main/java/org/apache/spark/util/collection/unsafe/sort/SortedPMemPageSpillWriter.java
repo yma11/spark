@@ -17,6 +17,10 @@
 
 package org.apache.spark.util.collection.unsafe.sort;
 
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform;
+
+import org.apache.spark.SparkEnv;
+import org.apache.spark.internal.config.package$;
 import org.apache.spark.executor.ShuffleWriteMetrics;
 import org.apache.spark.executor.TaskMetrics;
 import org.apache.spark.unsafe.Platform;
@@ -43,6 +47,9 @@ public class SortedPMemPageSpillWriter extends UnsafeSorterPMemSpillWriter {
     private SerializerManager serializerManager;
     private int fileBufferSize = 0;
     private UnsafeSorterSpillWriter diskSpillWriter;
+
+    private final boolean pMemClflushEnabled = SparkEnv.get() != null &&
+        (boolean)SparkEnv.get().conf().get(package$.MODULE$.MEMORY_SPILL_PMEM_CLFLUSH_ENABLED());
 
     public SortedPMemPageSpillWriter(
             UnsafeExternalSorter externalSorter,
@@ -146,12 +153,13 @@ public class SortedPMemPageSpillWriter extends UnsafeSorterPMemSpillWriter {
                 currentOffset,
                 prefix);
         currentOffset += Long.BYTES;
-        Platform.copyMemory(
+        PersistentMemoryPlatform.copyMemory(
                 baseObject,
                 baseOffset,
                 null,
                 currentOffset,
-                recLength);
+                recLength,
+                pMemClflushEnabled);
         numRecordsOnPMem ++;
         currentOffsetInPage += uaoSize + Long.BYTES + recLength;
     }

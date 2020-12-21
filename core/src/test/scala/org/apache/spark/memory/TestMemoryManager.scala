@@ -19,8 +19,8 @@ package org.apache.spark.memory
 
 import com.intel.oap.common.unsafe.PersistentMemoryPlatform
 import javax.annotation.concurrent.GuardedBy
-
 import scala.collection.mutable
+
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.config
 import org.apache.spark.storage.BlockId

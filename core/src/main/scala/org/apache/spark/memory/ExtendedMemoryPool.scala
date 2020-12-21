@@ -27,8 +27,8 @@ private[memory] class ExtendedMemoryPool(lock: Object) extends MemoryPool(lock) 
   private[this] val poolName: String = "extended memory"
 
   /**
-    * Map from taskAttemptId -> memory consumption in bytes
-    */
+   * Map from taskAttemptId -> memory consumption in bytes
+   */
   @GuardedBy("lock")
   private val extendedMemoryForTask = new mutable.HashMap[Long, Long]()
 
@@ -39,20 +39,20 @@ private[memory] class ExtendedMemoryPool(lock: Object) extends MemoryPool(lock) 
     _memoryUsed
   }
   /**
-    * Returns the memory consumption, in bytes, for the given task.
-    */
+   * Returns the memory consumption, in bytes, for the given task.
+   */
   def getMemoryUsageForTask(taskAttemptId: Long): Long = lock.synchronized {
     extendedMemoryForTask.getOrElse(taskAttemptId, 0L)
   }
 
   /**
-    * Try to acquire up to `numBytes` of extended memory for the given task and return the number
-    * of bytes obtained, or 0 if none can be allocated.
-    *
-    * @param numBytes           number of bytes to acquire
-    * @param taskAttemptId      the task attempt acquiring memory
-    * @return the number of bytes granted to the task.
-    */
+   * Try to acquire up to `numBytes` of extended memory for the given task and return the number
+   * of bytes obtained, or 0 if none can be allocated.
+   *
+   * @param numBytes           number of bytes to acquire
+   * @param taskAttemptId      the task attempt acquiring memory
+   * @return the number of bytes granted to the task.
+   */
   private[memory] def acquireMemory(
       numBytes: Long,
       taskAttemptId: Long): Long = lock.synchronized {
@@ -75,8 +75,8 @@ private[memory] class ExtendedMemoryPool(lock: Object) extends MemoryPool(lock) 
   }
 
   /**
-    * Release `numBytes` of extended memory acquired by the given task.
-    */
+   * Release `numBytes` of extended memory acquired by the given task.
+   */
   def releaseMemory(numBytes: Long, taskAttemptId: Long): Unit = lock.synchronized {
     val curMem = extendedMemoryForTask.getOrElse(taskAttemptId, 0L)
     val memoryToFree = if (curMem < numBytes) {
@@ -98,13 +98,14 @@ private[memory] class ExtendedMemoryPool(lock: Object) extends MemoryPool(lock) 
   }
 
   /**
-    * Release all memory for the given task and mark it as inactive (e.g. when a task ends).
-    *
-    * @return the number of bytes freed.
-    */
+   * Release all memory for the given task and mark it as inactive (e.g. when a task ends).
+   *
+   * @return the number of bytes freed.
+   */
   def releaseAllMemoryForTask(taskAttemptId: Long): Long = lock.synchronized {
     val numBytesToFree = getMemoryUsageForTask(taskAttemptId)
     releaseMemory(numBytesToFree, taskAttemptId)
     numBytesToFree
   }
 }
+

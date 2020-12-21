@@ -18,6 +18,9 @@
 package org.apache.spark.memory
 
 import javax.annotation.concurrent.GuardedBy
+
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
@@ -26,8 +29,6 @@ import org.apache.spark.storage.memory.MemoryStore
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.array.ByteArrayMethods
 import org.apache.spark.unsafe.memory.{MemoryAllocator, MemoryBlock}
-
-import scala.collection.mutable.ArrayBuffer
 
 /**
  * An abstract memory manager that enforces how memory is shared between execution and storage.
@@ -131,12 +132,12 @@ private[spark] abstract class MemoryManager(
       memoryMode: MemoryMode): Long
 
   /**
-    * try to acquire numBytes of extended memory for current task and return the number
-    * of number of bytes obtained, or 0 if non can be allocated.
-    * @param numBytes
-    * @param taskAttemptId
-    * @return
-    */
+   * try to acquire numBytes of extended memory for current task and return the number
+   * of number of bytes obtained, or 0 if non can be allocated.
+   * @param numBytes
+   * @param taskAttemptId
+   * @return
+   */
   private[memory]
   def acquireExtendedMemory(
       numBytes: Long,
@@ -192,19 +193,19 @@ private[spark] abstract class MemoryManager(
   }
 
   /**
-    * release extended memory of given task
-    * @param numBytes
-    * @param taskAttemptId
-    */
+   * release extended memory of given task
+   * @param numBytes
+   * @param taskAttemptId
+   */
   def releaseExtendedMemory(numBytes: Long, taskAttemptId: Long): Unit = synchronized {
     extendedMemoryPool.releaseMemory(numBytes, taskAttemptId)
   }
 
   /**
-    * release all extended memory occupied by given task
-    * @param taskAttemptId
-    * @return
-    */
+   * release all extended memory occupied by given task
+   * @param taskAttemptId
+   * @return
+   */
   def releaseAllExtendedMemoryForTask(taskAttemptId: Long): Long = synchronized {
     extendedMemoryPool.releaseAllMemoryForTask(taskAttemptId)
   }
@@ -220,9 +221,9 @@ private[spark] abstract class MemoryManager(
   }
 
   /**
-    * @param size size of current page request
-    * @return PMem Page that suits for current page request
-    */
+   * @param size size of current page request
+   * @return PMem Page that suits for current page request
+   */
   def getUsablePMemPage(size : Long): MemoryBlock = synchronized {
     for (pMemPage <- pMemPages) {
       if (pMemPage.pageNumber == MemoryBlock.FREED_IN_TMM_PAGE_NUMBER &&

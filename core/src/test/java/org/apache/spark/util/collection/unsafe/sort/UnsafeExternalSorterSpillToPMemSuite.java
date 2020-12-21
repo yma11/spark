@@ -77,6 +77,7 @@ public class UnsafeExternalSorterSpillToPMemSuite {
         conf = new SparkConf()
                 .set(package$.MODULE$.SHUFFLE_SPILL_COMPRESS(), false)
                 .set(package$.MODULE$.MEMORY_OFFHEAP_ENABLED(), false)
+                .set(package$.MODULE$.MEMORY_SPILL_PMEM_CLFLUSH_ENABLED(), true)
                 .set(package$.MODULE$.MEMORY_SPILL_PMEM_ENABLED(), true);
         memoryManager = new TestMemoryManager(conf);
         taskMemoryManager = new TaskMemoryManager(memoryManager, 0);

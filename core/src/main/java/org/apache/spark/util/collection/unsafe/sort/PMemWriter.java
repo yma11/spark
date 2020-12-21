@@ -17,15 +17,17 @@
 
 package org.apache.spark.util.collection.unsafe.sort;
 
+import com.intel.oap.common.unsafe.PersistentMemoryPlatform;
+
 import org.apache.spark.SparkEnv;
 import org.apache.spark.executor.ShuffleWriteMetrics;
 import org.apache.spark.executor.TaskMetrics;
 import org.apache.spark.internal.config.package$;
 import org.apache.spark.serializer.SerializerManager;
 import org.apache.spark.storage.BlockManager;
-import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.array.LongArray;
 import org.apache.spark.unsafe.memory.MemoryBlock;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +57,9 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
     private int totalRecordsWritten;
     private final boolean spillToPMemConcurrently = SparkEnv.get() != null && (boolean) SparkEnv.get().conf().get(
             package$.MODULE$.MEMORY_SPILL_PMEM_SORT_BACKGROUND());
+    private final boolean pMemClflushEnabled = SparkEnv.get() != null &&
+        (boolean)SparkEnv.get().conf().get(package$.MODULE$.MEMORY_SPILL_PMEM_CLFLUSH_ENABLED());
+
     public PMemWriter(
             UnsafeExternalSorter externalSorter,
             SortedIteratorForSpills sortedIterator,
@@ -173,7 +178,10 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
 
     private void dumpPageToPMem(MemoryBlock page) {
         MemoryBlock pMemBlock = pageMap.get(page);
-        Platform.copyMemory(page.getBaseObject(), page.getBaseOffset(), null, pMemBlock.getBaseOffset(), page.size());
+        PersistentMemoryPlatform.copyMemory(
+            page.getBaseObject(), page.getBaseOffset(),
+            null, pMemBlock.getBaseOffset(), page.size(),
+            pMemClflushEnabled);
         writeMetrics.incBytesWritten(page.size());
     }
 
@@ -192,7 +200,10 @@ public final class PMemWriter extends UnsafeSorterPMemSpillWriter {
         // copy the LongArray to PMem
         MemoryBlock arrayBlock = sortedArray.memoryBlock();
         MemoryBlock pMemBlock = pageMap.get(arrayBlock);
-        Platform.copyMemory(arrayBlock.getBaseObject(), arrayBlock.getBaseOffset(), null, pMemBlock.getBaseOffset(), arrayBlock.size());
+        PersistentMemoryPlatform.copyMemory(
+            arrayBlock.getBaseObject(), arrayBlock.getBaseOffset(),
+            null, pMemBlock.getBaseOffset(), arrayBlock.size(),
+            pMemClflushEnabled);
         writeMetrics.incBytesWritten(pMemBlock.size());
         this.sortedArray = new LongArray(pMemBlock);
     }
