@@ -341,7 +341,7 @@ package object config {
     ConfigBuilder("spark.memory.spill.pmem.enabled")
       .doc("Set memory spill to PMem instead of disk.")
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 
   val MEMORY_EXTENDED_PATH =
     ConfigBuilder("spark.memory.extended.path")
@@ -372,6 +372,15 @@ package object config {
     .doc("The spill writer type for UnsafeExteranlSorter")
     .stringConf
     .createWithDefault(PMemSpillWriterType.WRITE_SORTED_RECORDS_TO_PMEM.toString())
+
+  private[spark] val MEMORY_SPILL_PMEM_READ_BUFFERSIZE =
+    ConfigBuilder("spark.memory.spill.pmem.readBufferSize")
+      .doc("The buffer size, in bytes, to use when reading records from PMem.")
+      .bytesConf(ByteUnit.BYTE)
+      .checkValue(v => v > 12 && v <= ByteArrayMethods.MAX_ROUNDED_ARRAY_LENGTH,
+        s"The buffer size must be greater than 12 and less than or equal to " +
+          s"${ByteArrayMethods.MAX_ROUNDED_ARRAY_LENGTH}.")
+      .createWithDefaultString("8m")
 
   private[spark] val MEMORY_STORAGE_FRACTION = ConfigBuilder("spark.memory.storageFraction")
     .doc("Amount of storage memory immune to eviction, expressed as a fraction of the " +

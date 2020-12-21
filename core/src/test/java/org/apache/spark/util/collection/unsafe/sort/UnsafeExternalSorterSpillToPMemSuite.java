@@ -84,7 +84,7 @@ public class UnsafeExternalSorterSpillToPMemSuite {
         serializerManager = new SerializerManager(
                 new JavaSerializer(conf), conf);
         pageSizeBytes =  conf.getSizeAsBytes(
-                package$.MODULE$.BUFFER_PAGESIZE().key(), "4m");
+                package$.MODULE$.BUFFER_PAGESIZE().key(), "1m");
         spillThreshold =
                 (int) conf.get(package$.MODULE$.SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD());
 
