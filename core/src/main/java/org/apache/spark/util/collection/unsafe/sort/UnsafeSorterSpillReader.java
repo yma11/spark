@@ -36,22 +36,26 @@ import java.io.*;
  * Reads spill files written by {@link UnsafeSorterSpillWriter} (see that class for a description
  * of the file format).
  */
-public final class UnsafeSorterSpillReader extends UnsafeSorterIterator implements Closeable {
+public class UnsafeSorterSpillReader extends UnsafeSorterIterator implements Closeable {
   public static final int MAX_BUFFER_SIZE_BYTES = 16777216; // 16 mb
 
-  private InputStream in;
-  private DataInputStream din;
+  protected InputStream in;
+  protected DataInputStream din;
 
   // Variables that change with every record read:
-  private int recordLength;
-  private long keyPrefix;
-  private int numRecords;
-  private int numRecordsRemaining;
+  protected int recordLength;
+  protected long keyPrefix;
+  protected int numRecords;
+  protected int numRecordsRemaining;
 
-  private byte[] arr = new byte[1024 * 1024];
-  private Object baseObject = arr;
-  private final TaskContext taskContext = TaskContext.get();
-  private final TaskMetrics taskMetrics;
+  protected byte[] arr = new byte[1024 * 1024];
+  protected Object baseObject = arr;
+  protected final TaskContext taskContext = TaskContext.get();
+  protected final TaskMetrics taskMetrics;
+
+  public UnsafeSorterSpillReader(TaskMetrics taskMetrics) {
+    this.taskMetrics = taskMetrics;
+  }
 
   public UnsafeSorterSpillReader(
       SerializerManager serializerManager,

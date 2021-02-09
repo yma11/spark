@@ -368,6 +368,12 @@ package object config {
       .booleanConf
       .createWithDefault(false)
 
+  val PMEM_PROPERTY_FILE =
+    ConfigBuilder("spark.memory.spill.pmem.config.file")
+      .doc("A config file used to config Intel PMem settings for memory extension.")
+      .stringConf
+      .createWithDefault("pmem.properties")
+
   val USAFE_EXTERNAL_SORTER_SPILL_WRITE_TYPE = ConfigBuilder("spark.unsafe.sort.spillwriter.type")
     .doc("The spill writer type for UnsafeExteranlSorter")
     .stringConf
