@@ -53,18 +53,17 @@ public class PMemSpillWriterFactory {
                     writeMetrics,
                     taskMetrics);
         } else {
+            long startTime = System.nanoTime();
             if (sortedIterator == null) {
-                try {
-                    sortedIterator = externalSorter.getSortedIterator();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                sortedIterator = externalSorter.getInMemSorter().getSortedIterator();
             }
+            taskMetrics.incSpillSortTime(System.nanoTime() - startTime);
             if (spillToPMEMEnabled && sortedIterator instanceof UnsafeInMemorySorter.SortedIterator){
-                SortedIteratorForSpills sortedSpillIte = SortedIteratorForSpills.createFromExistingSorterIte(
-                        (UnsafeInMemorySorter.SortedIterator)sortedIterator,
-                        externalSorter.getInMemSorter());
+
                 if (writerType == PMemSpillWriterType.WRITE_SORTED_RECORDS_TO_PMEM) {
+                    SortedIteratorForSpills sortedSpillIte = SortedIteratorForSpills.createFromExistingSorterIte(
+                            (UnsafeInMemorySorter.SortedIterator)sortedIterator,
+                            externalSorter.getInMemSorter());
                     return new SortedPMemPageSpillWriter(
                             externalSorter,
                             sortedSpillIte,
@@ -72,6 +71,16 @@ public class PMemSpillWriterFactory {
                             serializerManager,
                             blockManager,
                             fileBufferSize,
+                            writeMetrics,
+                            taskMetrics);
+                }
+                if (spillToPMEMEnabled && writerType == PMemSpillWriterType.STREAM_SPILL_TO_PMEM) {
+                    return new UnsafeSorterStreamSpillWriter(
+                            blockManager,
+                            fileBufferSize,
+                            sortedIterator,
+                            numberOfRecordsToWritten,
+                            serializerManager,
                             writeMetrics,
                             taskMetrics);
                 }

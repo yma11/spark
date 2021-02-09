@@ -41,33 +41,34 @@ import org.slf4j.LoggerFactory;
  *
  *   [# of records (int)] [[len (int)][prefix (long)][data (bytes)]...]
  */
-public final class UnsafeSorterSpillWriter implements SpillWriterForUnsafeSorter{
+public class UnsafeSorterSpillWriter implements SpillWriterForUnsafeSorter{
   private static final Logger logger = LoggerFactory.getLogger(UnsafeSorterSpillWriter.class);
 
-  private final SparkConf conf = new SparkConf();
+  protected final SparkConf conf = new SparkConf();
 
   /**
    * The buffer size to use when writing the sorted records to an on-disk file, and
    * this space used by prefix + len + recordLength must be greater than 4 + 8 bytes.
    */
-  private final int diskWriteBufferSize =
+  protected final int diskWriteBufferSize =
     (int) (long) conf.get(package$.MODULE$.SHUFFLE_DISK_WRITE_BUFFER_SIZE());
 
   // Small writes to DiskBlockObjectWriter will be fairly inefficient. Since there doesn't seem to
   // be an API to directly transfer bytes from managed memory to the disk writer, we buffer
   // data through a byte array.
-  private byte[] writeBuffer = new byte[diskWriteBufferSize];
+  protected byte[] writeBuffer = new byte[diskWriteBufferSize];
 
-  private  File file = null;
-  private  BlockId blockId = null;
-  private int numRecordsToWrite = 0;
-  private DiskBlockObjectWriter writer;
-  private int numRecordsSpilled = 0;
+  protected File file = null;
+  protected BlockId blockId = null;
+  protected int numRecordsToWrite = 0;
+  protected DiskBlockObjectWriter writer;
+  protected int numRecordsSpilled = 0;
 
-  private UnsafeSorterIterator inMemIterator;
-  private SerializerManager serializerManager;
-  private TaskMetrics taskMetrics;
+  protected UnsafeSorterIterator inMemIterator;
+  protected SerializerManager serializerManager;
+  protected TaskMetrics taskMetrics;
 
+  public UnsafeSorterSpillWriter() {}
   public UnsafeSorterSpillWriter(
       BlockManager blockManager,
       int fileBufferSize,
@@ -75,7 +76,7 @@ public final class UnsafeSorterSpillWriter implements SpillWriterForUnsafeSorter
       int numRecordsToWrite,
       SerializerManager serializerManager,
       ShuffleWriteMetrics writeMetrics,
-      TaskMetrics taskMetrics) throws IOException {
+      TaskMetrics taskMetrics) {
     final Tuple2<TempLocalBlockId, File> spilledFileInfo =
       blockManager.diskBlockManager().createTempLocalBlock();
     this.file = spilledFileInfo._2();
@@ -138,7 +139,7 @@ public final class UnsafeSorterSpillWriter implements SpillWriterForUnsafeSorter
   }
 
   // Based on DataOutputStream.writeInt.
-  private void writeIntToBuffer(int v, int offset) {
+  protected void writeIntToBuffer(int v, int offset) {
     writeBuffer[offset + 0] = (byte)(v >>> 24);
     writeBuffer[offset + 1] = (byte)(v >>> 16);
     writeBuffer[offset + 2] = (byte)(v >>>  8);
@@ -209,22 +210,24 @@ public final class UnsafeSorterSpillWriter implements SpillWriterForUnsafeSorter
   }
 
   public void write(boolean alreadyLoad) throws IOException {
-   if (inMemIterator != null) {
-     if (alreadyLoad) {
-       final Object baseObject = inMemIterator.getBaseObject();
-       final long baseOffset = inMemIterator.getBaseOffset();
-       final int recordLength = inMemIterator.getRecordLength();
-       write(baseObject, baseOffset, recordLength, inMemIterator.getKeyPrefix());
-     }
-     while (inMemIterator.hasNext()) {
-       inMemIterator.loadNext();
-       final Object baseObject = inMemIterator.getBaseObject();
-       final long baseOffset = inMemIterator.getBaseOffset();
-       final int recordLength = inMemIterator.getRecordLength();
-       write(baseObject, baseOffset, recordLength, inMemIterator.getKeyPrefix());
-     }
-     close();
-   }
+    long startTime = System.nanoTime();
+    if (inMemIterator != null) {
+      if (alreadyLoad) {
+        final Object baseObject = inMemIterator.getBaseObject();
+        final long baseOffset = inMemIterator.getBaseOffset();
+        final int recordLength = inMemIterator.getRecordLength();
+        write(baseObject, baseOffset, recordLength, inMemIterator.getKeyPrefix());
+      }
+      while (inMemIterator.hasNext()) {
+        inMemIterator.loadNext();
+        final Object baseObject = inMemIterator.getBaseObject();
+        final long baseOffset = inMemIterator.getBaseOffset();
+        final int recordLength = inMemIterator.getRecordLength();
+        write(baseObject, baseOffset, recordLength, inMemIterator.getKeyPrefix());
+      }
+      close();
+    }
+    taskMetrics.incShuffleSpillWriteTime(System.nanoTime() - startTime);
   }
 
   public UnsafeSorterSpillReader getReader(SerializerManager serializerManager,

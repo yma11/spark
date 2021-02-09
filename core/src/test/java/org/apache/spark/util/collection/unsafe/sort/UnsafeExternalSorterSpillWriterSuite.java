@@ -37,6 +37,7 @@ public class UnsafeExternalSorterSpillWriterSuite extends UnsafeExternalSorterSu
             SpillWriterForUnsafeSorter pMemWriter = sorter.spillWithWriter(sortedIte, sortedIte.getNumRecords(),writeMetrics, true);
             UnsafeSorterIterator pMemReader = pMemWriter.getSpillReader();
             verifyIntIterator(pMemReader, 0, 100);
+            sorter.cleanupResources();
         }
     }
 }

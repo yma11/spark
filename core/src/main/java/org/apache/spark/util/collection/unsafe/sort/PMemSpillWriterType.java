@@ -18,6 +18,7 @@
 package org.apache.spark.util.collection.unsafe.sort;
 
 public enum PMemSpillWriterType {
+    STREAM_SPILL_TO_PMEM,
     MEM_COPY_ALL_DATA_PAGES_TO_PMEM,
     MEM_COPY_ALL_DATA_PAGES_TO_PMEM_WITHLONGARRAY,
     WRITE_SORTED_RECORDS_TO_PMEM
