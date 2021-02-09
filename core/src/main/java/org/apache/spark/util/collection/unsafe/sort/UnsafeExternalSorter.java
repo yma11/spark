@@ -542,10 +542,12 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
           && numRecords > 0)) {
           return 0L;
         }
+        UnsafeInMemorySorter.SortedIterator inMemIterator =
+                ((UnsafeInMemorySorter.SortedIterator) upstream).clone();
         
         ShuffleWriteMetrics writeMetrics = new ShuffleWriteMetrics();
         long released = 0L;
-        SpillWriterForUnsafeSorter spillWriter = spillWithWriter(upstream, numRecords, writeMetrics, true);
+        SpillWriterForUnsafeSorter spillWriter = spillWithWriter(inMemIterator, numRecords, writeMetrics, true);
         nextUpstream = spillWriter.getSpillReader();
 
         synchronized (UnsafeExternalSorter.this) {
