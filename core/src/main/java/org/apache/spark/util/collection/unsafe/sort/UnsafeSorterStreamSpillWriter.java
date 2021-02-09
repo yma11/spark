@@ -25,7 +25,6 @@ public class UnsafeSorterStreamSpillWriter extends UnsafeSorterSpillWriter {
       ShuffleWriteMetrics writeMetrics,
       TaskMetrics taskMetrics) {
     super();
-    System.out.println("getting stream writer");
     final Tuple2<TempLocalBlockId, File> spilledFileInfo =
             blockManager.diskBlockManager().createTempLocalBlock();
     this.file = spilledFileInfo._2();
@@ -54,7 +53,6 @@ public class UnsafeSorterStreamSpillWriter extends UnsafeSorterSpillWriter {
   @Override
   public void clearAll() {
     assert(reader != null);
-    System.out.println("trying to clean spilled data.");
     try {
         reader.chunkInputStream.free();
     } catch (IOException e) {
