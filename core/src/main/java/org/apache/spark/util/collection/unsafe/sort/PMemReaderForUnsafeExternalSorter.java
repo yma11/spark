@@ -44,7 +44,6 @@ public final class PMemReaderForUnsafeExternalSorter extends UnsafeSorterIterato
 
     @Override
     public void loadNext() {
-        startTime = System.nanoTime();
         if (!byteBuffer.hasRemaining()) {
             boolean refilled = refill();
             if (!refilled) {
@@ -58,7 +57,6 @@ public final class PMemReaderForUnsafeExternalSorter extends UnsafeSorterIterato
             baseObject = arr;
         }
         byteBuffer.get(arr, 0, recordLength);
-        taskMetrics.incShuffleSpillReadTime(System.nanoTime() - startTime);
         numRecordsRemaining --;
     }
 
