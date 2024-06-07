@@ -120,7 +120,7 @@ private[spark] class UnifiedMemoryManager(
         if (memoryReclaimableFromStorage > 0) {
           // Only reclaim as much space as is necessary and available:
           val spaceToReclaim = storagePool.freeSpaceToShrinkPool(
-            math.min(extraMemoryNeeded, memoryReclaimableFromStorage))
+            math.min(extraMemoryNeeded, memoryReclaimableFromStorage), conf)
           storagePool.decrementPoolSize(spaceToReclaim)
           executionPool.incrementPoolSize(spaceToReclaim)
         }
@@ -178,7 +178,7 @@ private[spark] class UnifiedMemoryManager(
       executionPool.decrementPoolSize(memoryBorrowedFromExecution)
       storagePool.incrementPoolSize(memoryBorrowedFromExecution)
     }
-    storagePool.acquireMemory(blockId, numBytes)
+    storagePool.acquireMemory(blockId, numBytes, conf)
   }
 
   override def acquireUnrollMemory(
